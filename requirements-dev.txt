@@ -1,0 +1,38 @@
+# Test-only dependencies. NEVER add these to requirements.txt.
+#
+# Per CLAUDE.md, a new entry in requirements.txt requires regenerating
+# requirements.lock by resolving it in a clean linux/amd64 container, and the
+# lock is what the Dockerfile installs. Putting pytest there would therefore
+# both force a lockfile regeneration and ship the test runner in the deployed
+# image. This file is never copied into the image: the Dockerfile COPYs only
+# requirements.lock, app/, knowledge/, templates/, static/ and profile.json.
+#
+#     python3 -m pip install -r requirements-dev.txt
+#     python3 -m pytest              # fast suite
+#     python3 -m pytest -m slow      # the deselected-by-default ones
+pytest>=8.0,<9.0
+httpx>=0.27,<1.0
+
+# For evals/ only, which like tests/ is never copied into the image.
+#
+# app/ deliberately does not import this (see `_is_upstream_throttle` in
+# app/main.py: doing so would make groq a direct runtime dependency and force a
+# lockfile regeneration). evals/ is under no such constraint, and it needs the
+# raw client because langchain-groq discards the per-call queue_time,
+# prompt_time and completion_time fields that the latency probe exists to read.
+# Already present transitively as groq==0.37.1 in requirements.lock; named here
+# so the dependency is declared where it is actually used.
+groq>=0.37,<1.0
+
+# evals/questions.yaml. Present transitively already (langchain depends on it),
+# named here because the eval harness and tests/test_evals_questions.py import
+# it directly rather than inheriting it by accident.
+pyyaml>=6.0,<7.0
+
+# scripts/resume_import.py only, for the resume import that now opens setup.
+#
+# Imported lazily and named here rather than in requirements.txt: scripts/ runs
+# on a laptop and is never COPYed into the image, so a dependency only it needs
+# has no business in the lockfile. It was optional while the import was one
+# prompt near the end; it is on the happy path now, so it is declared.
+pypdf>=4.0,<8.0

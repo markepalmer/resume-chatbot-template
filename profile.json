@@ -1,0 +1,207 @@
+{
+  "name": "Dana Reyes",
+  "known_as": "Dana",
+  "role": "Backend Engineer",
+  "photo": "/static/photo.png",
+  "tagline": "B.S. Computer Science, Portland State University (June 2025). I build backend services and data pipelines, mostly in Python and Go. I like problems where the hard part is correctness under load rather than the feature itself, and I care about systems that stay debuggable at 3am.",
+  "bio": {
+    "meta": "B.S. Computer Science · Portland State University, June 2025",
+    "lead": [
+      "Two years building and operating the ingestion pipeline behind a logistics product, where a late batch was a customer-visible failure rather than an internal one.",
+      "I am most useful on the seam between a service and its data: schemas, backfills, idempotency, and the retry logic nobody wants to own."
+    ],
+    "close": "Looking for backend or data platform work on a team that measures things."
+  },
+  "email": "",
+  "resume_pdf": "",
+  "location": "Portland, OR",
+  "site_url": "",
+  "ask_links": {
+    "pipeline": "Tell me about the ingestion pipeline you built.",
+    "scheduler": "What was hard about the job scheduler?",
+    "roles": "What roles are you looking for?",
+    "site": "How does this chatbot work?"
+  },
+  "links": [
+    {
+      "label": "GitHub",
+      "url": "https://github.com/danareyes-example"
+    },
+    {
+      "label": "LinkedIn",
+      "url": "https://www.linkedin.com/in/danareyes-example"
+    }
+  ],
+  "highlights": [
+    {
+      "title": "Ingestion pipeline for logistics events",
+      "body": "Rebuilt a nightly batch import as an incremental pipeline with idempotent writes, cutting the window from 40 minutes to under 4 and making a partial failure safe to rerun.",
+      "stat": {
+        "value": 4,
+        "suffix": " min",
+        "label": "Ingestion window, down from 40"
+      }
+    },
+    {
+      "title": "Job scheduler with exactly-once semantics",
+      "body": "A Postgres-backed scheduler using advisory locks and a claim table, so a duplicated worker cannot run the same job twice. Documented the failure modes it does not cover.",
+      "stat": {
+        "value": 0,
+        "suffix": " dupes",
+        "label": "Duplicate job runs after rollout"
+      }
+    },
+    {
+      "title": "Schema migration with no downtime",
+      "body": "Moved a 90M row table to a new key layout using a dual-write and backfill, verified by a row-level diff before the cutover.",
+      "stat": {
+        "value": 90,
+        "suffix": "M rows",
+        "label": "Migrated with no read downtime"
+      }
+    },
+    {
+      "title": "On-call runbooks that people actually used",
+      "body": "Wrote the runbooks for the six alerts that paged most often, each naming the query to run first. Mean time to first useful action dropped noticeably.",
+      "stat": {
+        "value": 6,
+        "suffix": " alerts",
+        "label": "Runbooks written for the noisiest pages"
+      }
+    },
+    {
+      "title": "This site",
+      "body": "A grounded RAG chatbot over my own background: FastAPI, FAISS, a local embedding model, and a two pass drafter and judge pipeline so nothing unverified reaches the page."
+    }
+  ],
+  "starter_questions": [
+    "What did you build at Cascade Freight?",
+    "How do you approach a risky schema migration?",
+    "What roles are you looking for?",
+    "How does this chatbot work?"
+  ],
+  "career": [
+    {
+      "label": "Portland State University",
+      "detail": "B.S. Computer Science",
+      "kind": "education",
+      "start": "2021-09",
+      "end": "2025-06",
+      "skills": [
+        "Python",
+        "Algorithms",
+        "Databases"
+      ]
+    },
+    {
+      "label": "Cascade Freight",
+      "detail": "Backend Engineer, data platform",
+      "kind": "work",
+      "start": "2023-06",
+      "end": "2025-08",
+      "skills": [
+        "Python",
+        "PostgreSQL",
+        "Airflow",
+        "Docker",
+        "Observability"
+      ]
+    },
+    {
+      "label": "Ingestion pipeline rebuild",
+      "detail": "Nightly batch to incremental, idempotent writes",
+      "kind": "project",
+      "start": "2024-01",
+      "end": "2024-06",
+      "skills": [
+        "Python",
+        "PostgreSQL",
+        "Airflow",
+        "Idempotency"
+      ]
+    },
+    {
+      "label": "Job scheduler",
+      "detail": "Advisory locks and a claim table for exactly-once runs",
+      "kind": "project",
+      "start": "2024-08",
+      "end": "2025-02",
+      "skills": [
+        "Go",
+        "PostgreSQL",
+        "Concurrency",
+        "Testing"
+      ]
+    },
+    {
+      "label": "Zero downtime migration",
+      "detail": "Dual write and backfill across 90M rows",
+      "kind": "project",
+      "start": "2025-03",
+      "end": "2025-07",
+      "skills": [
+        "PostgreSQL",
+        "Python",
+        "Testing",
+        "Observability"
+      ]
+    },
+    {
+      "label": "Resume chatbot",
+      "detail": "Grounded RAG over my own background",
+      "kind": "project",
+      "start": "2025-08",
+      "end": "2025-12",
+      "skills": [
+        "Python",
+        "FastAPI",
+        "RAG",
+        "Docker"
+      ]
+    }
+  ],
+  "skills": {
+    "Backend": [
+      "Python",
+      "Go",
+      "FastAPI",
+      "REST APIs",
+      "Concurrency",
+      "Idempotency"
+    ],
+    "Data": [
+      "PostgreSQL",
+      "Airflow",
+      "SQL",
+      "Schema design",
+      "Backfills",
+      "Databases"
+    ],
+    "Platform": [
+      "Docker",
+      "CI/CD",
+      "Observability",
+      "Testing",
+      "Linux"
+    ],
+    "Foundations": [
+      "Algorithms",
+      "Distributed systems",
+      "RAG",
+      "Technical writing"
+    ]
+  },
+  "masthead_forms": [
+    "horizon",
+    "wave",
+    "torus"
+  ],
+  "always_on_sections": [
+    [
+      "projects/ingestion-pipeline.md",
+      "Confidentiality"
+    ]
+  ],
+  "confidential_files": [],
+  "confidential_heading_pattern": "confidentiality"
+}

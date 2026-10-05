@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ profile.name }} — {{ profile.role }}</title>
+  <meta name="description" content="{{ profile.tagline }}" />
+
+  {#
+    Social card and structured data. Both exist for the same reason: this link
+    gets pasted into LinkedIn, into email, and into an application form, and a
+    URL with no card renders as a bare blue string next to everyone else's
+    preview image.
+
+    Everything here is derived from profile.json, so a fork gets its own card
+    rather than inheriting this one. The whole block is gated on `site_url`
+    because og:image and og:url must be absolute: a scraper fetches them with no
+    page to resolve a relative path against, and a card with a broken image is
+    worse than no card at all, since most scrapers cache the first failure.
+
+    The JSON-LD carries a nonce despite never executing. CSP applies to every
+    inline <script> by type, not by whether it runs, and without the nonce the
+    block is dropped before a crawler ever parses it (CLAUDE.md).
+  #}
+  {% if profile.site_url %}
+  {%- set site = profile.site_url.rstrip('/') -%}
+  <link rel="canonical" href="{{ site }}/" />
+  <meta property="og:type" content="profile" />
+  <meta property="og:site_name" content="{{ profile.name }}" />
+  <meta property="og:title" content="{{ profile.name }} — {{ profile.role }}" />
+  <meta property="og:description" content="{{ profile.tagline }}" />
+  <meta property="og:url" content="{{ site }}/" />
+  {% if card_image %}
+  <meta property="og:image" content="{{ card_image }}" />
+  <meta property="og:image:alt" content="{{ profile.name }}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  {% else %}
+  <meta name="twitter:card" content="summary" />
+  {% endif %}
+  <meta name="twitter:title" content="{{ profile.name }} — {{ profile.role }}" />
+  <meta name="twitter:description" content="{{ profile.tagline }}" />
+  <script type="application/ld+json" nonce="{{ csp_nonce }}">
+    {{ person_ld | safe }}
+  </script>
+  {% endif %}
+
+  {#
+    Favicon as an inline data URI rather than a file in static/, so the initial
+    comes from profile.json like everything else and a fork does not inherit
+    somebody else's monogram. A file would have to be hand drawn per fork or
+    hardcode one person's letter, which the no-personal-details rule forbids.
+
+    The colors are literals because an icon cannot read the stylesheet or follow
+    the theme toggle, which is the same reason the career arc has to be inlined
+    rather than pointed at. This one is fixed indigo in both themes.
+
+    CSP allows it: img-src includes data:.
+  #}
+  {%- set favicon -%}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#4f46e5"/><text x="32" y="45" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="36" font-weight="600" fill="#ffffff" text-anchor="middle">{{ (profile.known_as or profile.name)[0] | upper }}</text></svg>
+  {%- endset -%}
+  <link rel="icon" href="data:image/svg+xml,{{ favicon | trim | urlencode }}" />
+
+  <link rel="stylesheet" href="/static/styles.css?v={{ asset_v }}" />
+  <script nonce="{{ csp_nonce }}">
+    // Mark that scripting is live, before first paint and before styles.css can
+    // matter. The scroll reveal hides every section at opacity 0 and only
+    // app.js ever adds .in, so hiding unconditionally means a visitor without
+    // JS gets a masthead and nothing else: no resume, no chat, no career arc.
+    // Gating the hide on .js makes visible the resting state and the animation
+    // the enhancement, which is the direction that fails safe.
+    //
+    // Set here rather than in app.js because app.js is deferred: a class added
+    // after first paint would let the sections paint, then blank them.
+    document.documentElement.classList.add("js");
+
+    // Apply the saved theme before first paint so the page never flashes the
+    // wrong background.
+    try {
+      var t = localStorage.getItem("theme");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+<!-- Ambient layer: drifting color blobs behind the whole page. -->
+<div class="aurora" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
+<div class="progress" id="progress" aria-hidden="true"></div>
+<button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch color theme">◐</button>
+
+<main class="page">
+  <header class="masthead">
+    <!-- WebGL particle cloud, spanning the header behind the type. Empty on
+         purpose: app.js decides whether to load three.js at all (wide viewport,
+         motion allowed, working context) and removes this element if it cannot,
+         so the markup carries no assumption that it will ever be filled.
+
+         data-forms is the cycle of shapes the cloud morphs between, straight
+         from profile.json. An attribute rather than a second application/json
+         block: it is a short list of bare names, and masthead3d.js drops any it
+         does not recognise, so there is nothing here for a parse failure to lose
+         that a typo would not lose anyway. -->
+    <div class="masthead-object" id="masthead-3d" aria-hidden="true"
+         data-forms="{{ profile.masthead_forms | join(',') }}"><canvas></canvas></div>
+    {% if profile.photo %}
+    <div class="avatar-ring">
+      <img class="avatar" src="{{ profile.photo }}" alt="{{ profile.name }}" />
+    </div>
+    {% endif %}
+    <h1 class="name">{{ profile.name }}</h1>
+    {# The job title is a bordered pill again, and it sits outside `.bio` on its
+       own line rather than sharing the credential row.
+
+       It was a pill, then emphasis inside the bio row, and is a pill again. The
+       reason it works here and did not before is what surrounds it: the version
+       that was retired sat above a paragraph of body copy, so the page carried a
+       box and a plate and read as two frames stacked. The bio is three short
+       rows between two hairlines now, and a single bordered label above them
+       reads as a label rather than as a competing container.
+
+       `scrambleRole` in app.js selects `.role` for the load-time decode, so the
+       class name is load bearing wherever this element moves to. #}
+    {% if profile.role %}
+    <p class="role-line"><span class="role">{{ profile.role }}</span></p>
+    {% endif %}
+    {# The bio proper: the credential, optionally the work, one closing line. The
+       lead row's items are joined by a drawn dot rather than a character so the
+       separator can be tinted and sized independently of the type, and so it
+       disappears cleanly when the row stacks on a phone. Falls back to the
+       tagline paragraph when `bio` is empty, which is what a fresh fork has
+       until setup_profile.py fills it in. #}
+    {% if profile.bio and (profile.bio.meta or profile.bio.lead or profile.bio.close) %}
+    <div class="bio">
+      {% if profile.bio.meta %}
+      <p class="bio-meta"><span class="bio-degree">{{ profile.bio.meta }}</span></p>
+      {% endif %}
+      {# The lead row is optional, and empty is the shipping state here rather
+         than an unfinished one. It listed the same three themes as the highlight
+         cards below, in the same words, so the header spent its largest run of
+         type restating what the reader was about to scroll into. The row itself
+         is kept because a fork may well want it, and because the dot separator
+         and its stacking behaviour are tuned and were expensive to get right. #}
+      {% if profile.bio.lead %}
+      <p class="bio-lead">
+        {% for item in profile.bio.lead %}
+        <span>{{ item }}</span>{% if not loop.last %}<i aria-hidden="true"></i>{% endif %}
+        {% endfor %}
+      </p>
+      {% endif %}
+      {% if profile.bio.close %}<p class="bio-close">{{ profile.bio.close }}</p>{% endif %}
+    </div>
+    {% else %}
+    {# The fallback no longer re-renders the title. It used to, because the title
+       lived inside the bio block and a fork without a bio would otherwise have
+       lost it entirely. The pill is unconditional above now, so repeating it
+       here would print the job title twice on exactly the forks least able to
+       notice. #}
+    <p class="tagline">{{ profile.tagline }}</p>
+    {% endif %}
+    <nav class="contact">
+      {% set tints = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)'] %}
+      {% if profile.email %}<a style="--tint: {{ tints[0] }}" href="mailto:{{ profile.email }}">{{ profile.email }}</a>{% endif %}
+      {% if profile.location %}<span class="pill">{{ profile.location }}</span>{% endif %}
+      {% for link in profile.links %}
+        <a style="--tint: {{ tints[(loop.index0 + 1) % 6] }}" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+      {% endfor %}
+    </nav>
+  </header>
+
+  {# The stat band, only in its legacy form: a flat list with no card to sit
+     over. When the cards carry their numbers the tiles render inside the
+     carousel below, one column per card, so the two rows are one scroll and
+     cannot fall out of step. See stats_from in app/profile.py. #}
+  {% if profile.stats and not (profile.highlights | selectattr('stat') | list) %}
+  <section class="stats reveal" id="stats" aria-label="By the numbers">
+    {% for s in profile.stats %}
+    <div class="stat" style="--tint: {{ tints[s.tint % 6] }}">
+      <div class="stat-value" data-value="{{ s.value }}" data-prefix="{{ s.prefix | default('', true) }}" data-suffix="{{ s.suffix | default('', true) }}">{{ s.prefix | default('', true) }}{{ s.value }}{{ s.suffix | default('', true) }}</div>
+      <span class="stat-label">{{ s.label }}</span>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if profile.highlights %}
+  <section class="carousel reveal" aria-label="Highlights">
+    <button type="button" class="car-arrow prev" aria-label="Previous">&lsaquo;</button>
+    <div class="car-track" id="car-track">
+      {% for card in profile.highlights %}
+      {% set s = card.stat %}
+      <div class="car-col" style="--tint: {{ tints[loop.index0 % 6] }}">
+        {% if s %}
+        <div class="stat">
+          <!-- data-value drives the count-up animation; the text content is the
+               already-correct final value for no-JS readers. -->
+          <div class="stat-value" data-value="{{ s.value }}" data-prefix="{{ s.prefix | default('', true) }}" data-suffix="{{ s.suffix | default('', true) }}">{{ s.prefix | default('', true) }}{{ s.value }}{{ s.suffix | default('', true) }}</div>
+          <span class="stat-label">{{ s.label }}</span>
+        </div>
+        {% endif %}
+        {% if card.url %}
+        <a class="card linked" href="{{ card.url }}" target="_blank" rel="noopener noreferrer">
+          <h2>{{ card.title }}</h2>
+          <p>{{ card.body }}</p>
+        </a>
+        {% else %}
+        <article class="card">
+          <h2>{{ card.title }}</h2>
+          <p>{{ card.body }}</p>
+        </article>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="car-arrow next" aria-label="Next">&rsaquo;</button>
+  </section>
+  {% endif %}
+
+  <section class="chat reveal" aria-label="Ask about {{ profile.known_as }}">
+    <div class="chat-head">
+      <h2><span class="live-dot" aria-hidden="true"></span>Ask about {{ profile.known_as }}</h2>
+      <p class="chat-note">
+        This assistant answers only from {{ profile.known_as }}'s real background. It drafts
+        an answer, then a second model checks it against the source documents before showing it, so it
+        declines rather than guesses.
+      </p>
+    </div>
+
+    {# data-owner carries the informal name into app.js, which builds the
+       "Checking <name>'s background" line while the pipeline runs. The name has
+       to arrive as data: app.js had it spelled out as a literal, which is the
+       one thing the no-hardcoded-personal-details rule exists to stop, and it
+       meant a fork greeted its own visitors with this owner's name. The copy
+       stays in app.js with the rest of the chat's strings. #}
+    <div id="messages" class="messages" role="log" aria-live="polite"
+         data-owner="{{ profile.known_as }}"></div>
+
+    {#
+      Answers to the starter questions, produced ahead of time by the real
+      pipeline and passed by the real judge (tools/build_starter_answers.py).
+      A chip whose question is in here answers with no request at all, which
+      keeps the day's Groq budget for questions nobody has answered yet.
+
+      `[]` whenever the file is missing or no longer matches the corpus, and the
+      client then asks live, exactly as it did before this existed. Carries a
+      nonce because CSP drops an inline <script> without one whether or not it
+      executes, and this one never does: it is data, read by app.js.
+    #}
+    <script type="application/json" id="starter-answers" nonce="{{ csp_nonce }}">{{ starter_answers | safe }}</script>
+
+    {% if profile.starter_questions %}
+    <div class="suggestions" id="suggestions">
+      {% for q in profile.starter_questions %}
+      <button type="button" class="chip" style="--tint: {{ tints[loop.index0 % 6] }}">{{ q }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form id="chat-form" class="composer" autocomplete="off">
+      <input
+        id="question"
+        name="question"
+        type="text"
+        placeholder="Ask a question about {{ profile.known_as }}..."
+        maxlength="800"
+        aria-label="Your question"
+        value="{{ prefill }}"
+        {% if prefill %}data-prefilled="1"{% endif %}
+        required
+      />
+      <button id="send" type="submit">Ask</button>
+    </form>
+  </section>
+
+  {# The eval panel sits directly under the chat on purpose, and this is a
+     deliberate reversal. It used to sit beside the results chart, on the
+     argument that the capstone's measurements and this site's read as one habit
+     when adjacent. True, and it cost more than it bought: the section is about
+     the thing immediately above it, and four sections away the reader had long
+     since stopped wondering whether the assistant could be trusted. Proximity to
+     its subject beats thematic grouping. The results chart keeps its own figure
+     and loses nothing by standing alone.
+
+     Both artifacts come from tools/build_eval_panel.py, and the section is
+     skipped entirely when either is missing, which is the state of any fork that
+     has not run the harness. Same contract as the two figures above it.
+
+     It is a card, like the chat, so it reads as its own section rather than as
+     the chat panel's footer. Method, limits and the technical tracks live in the
+     collapsed table, so the figure itself stays two claims in plain words. The
+     note says what an eval is before anything else, because the first version
+     assumed the reader knew and nobody outside the field could say what it
+     claimed. #}
+  {% if eval_panel_svg and eval_panel_data and eval_panel_data.rows %}
+  <section class="evals eval-card reveal" aria-label="How the chatbot is measured">
+    <h2 class="sec-title centered" style="--tint: var(--c1); --tint2: var(--c4)">How this chatbot is measured</h2>
+    <p class="results-note">
+      An eval is a fixed set of test questions with known answers, rerun after every change to see
+      whether the chatbot got better or worse.{% set h = eval_panel_data.headline %}{% if h and h.n %}
+      On the latest run, the right source is found for {% if h.found == h.n %}all {{ h.n }}{% else %}{{ h.found }} of {{ h.n }}{% endif %}.{% endif %}
+      Each row below is a change the numbers decided.
+    </p>
+    <div class="eval-wrap">
+      <!-- Inlined for the same reason as the other two figures: an external SVG
+           cannot read this page's variables, so it could not follow the theme
+           toggle. Built by tools/build_eval_panel.py; rerun it when
+           FINDINGS changes. -->
+      {{ eval_panel_svg | safe }}
+    </div>
+    {# Not a debug view. It is the figure itself under 760px, where the SVG's
+       type would fall below 10 CSS px, and it is the no-JS and print path.
+       Generated from the same run files as the SVG so the two cannot drift. #}
+    <details class="results-table eval-table">
+      <summary>View the numbers</summary>
+      <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Finding</th>
+            <th scope="col">Measure</th>
+            <th scope="col">Before</th>
+            <th scope="col">After</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in eval_panel_data.rows %}
+          {% for m in row.metrics %}
+          <tr>
+            {% if loop.first %}
+            <th scope="rowgroup" rowspan="{{ row.metrics | length }}">
+              {{ row.idx }} {{ row.title }}<br><span class="src">{{ row.verdict }}</span>
+            </th>
+            {% endif %}
+            <td>{{ m.label }}<br><span class="src">n={{ m.n }}</span></td>
+            <td class="n">{{ "%.0f%%" | format(m.before * 100) }}</td>
+            <td class="n">{{ "%.0f%%" | format(m.after * 100) }}</td>
+          </tr>
+          {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <p class="src">
+        Method: a free offline search test runs on every change, and an answer test calls
+        the live model. Scores are recomputed from stored answers. Limits: facts match as
+        phrases and refusals by a marker list, so scores are triage and transcripts are read.
+        In 03, before is the original grade of the same stored answers. Run files are in
+        <code>evals/results/</code>.
+      </p>
+    </details>
+  </section>
+  {% endif %}
+
+  {% if career_arc_svg and profile.career %}
+  <section class="skills reveal" aria-label="Skills in context">
+    <h2 class="sec-title centered" style="--tint: var(--c3); --tint2: var(--c4)">Skills in Context</h2>
+    <!-- One figure and one story: the arc is when each skill was used, and the
+         steps walk it one engagement at a time. The skill network used to share
+         this walk as a second figure; two encodings of the same 46 skills side
+         by side was more than any reader would learn at once, so it has its own
+         section below.
+
+         Says what the figure is, not how to operate it. The second sentence
+         describes the walk and is shown by the same query that builds it, so
+         the note cannot claim a behaviour the layout is not providing. -->
+    <p class="skills-note">Every line joins a role or project to a skill it used.<span class="walk-scroll">
+      Scroll to walk the career in order and watch the skills build up.</span></p>
+
+    <!-- Kind and shade are recomputed here for the steps, and the rule has to
+         stay identical to assign_kinds() in tools/build_career_arc.py or a step
+         stops matching its segment: hue by kind, shade by position among the
+         same kind in profile.json order, 62% to 100%. It was a macro because it
+         had two callers, the steps and the chips; the chips are gone and it is
+         still a macro, because the next caller is how a copied rule drifts. -->
+    {% set kind_tint = {'education': 'var(--c1)', 'work': 'var(--c4)', 'project': 'var(--c3)'} %}
+    {%- macro eng_tint(e) -%}
+      {%- set kind = e.kind if e.kind in kind_tint else 'project' -%}
+      {%- set peers = profile.career | selectattr('kind', 'equalto', e.kind) | list -%}
+      {%- set shade = 62 + 38 * peers.index(e) / (peers | length - 1) if peers | length > 1 else 100 -%}
+      --tint: {{ kind_tint[kind] }}; --shade: {{ shade | round(1) }}%
+    {%- endmacro -%}
+    {%- macro eng_years(e) -%}
+      {%- if e.start[:4] == e.end[:4] %}{{ e.start[:4] }}{% else %}{{ e.start[:4] }}&ndash;{{ e.end[:4] }}{% endif -%}
+    {%- endmacro -%}
+
+    <!-- The figure sticks and the steps scroll past it, which is a layout the
+         CSS owns entirely: app.js decides whether to drive the walk by reading
+         `position` back off .walk-figure rather than by testing the same media
+         query a second time, so the two cannot disagree about whether this
+         section is a walk or a plain figure. -->
+    <div class="walk skills-walk">
+      <div class="walk-figure">
+        <!-- Inlined, not an <img>: an external SVG document cannot read this
+             page's CSS variables, so it would miss the theme toggle entirely.
+             Built by tools/build_career_arc.py, rerun it when `career` changes. -->
+        <div class="career-wrap">
+          {{ career_arc_svg | safe }}
+        </div>
+      </div>
+
+      <!-- The narration, and the only list of engagements the page has.
+           data-eng is the engagement's index in profile.json order, the same
+           number the generator writes onto that engagement's segment, chords and
+           name. An <ol> because the walk is in career order and that ordering is
+           the content, not the styling. Without JS none of them is ever marked
+           live, which is why the dimming is gated on .js.
+
+           The first and last steps are not engagements. The first teaches the
+           encoding on the first engagement (data-intro switches on the
+           callouts drawn into the SVG), and the last returns the whole figure,
+           so the dense view is where the walk ends rather than where it starts.
+           An empty data-eng is that all-on state. -->
+      <ol class="walk-steps">
+        <li class="walk-step step-frame" data-eng="0" data-intro>
+          <p class="step-when">How to read it</p>
+          <h3>One band per role, degree or project</h3>
+          <p class="step-detail">Bands sit along the top in time order. Lines run down from each band to the skills that work used.</p>
+        </li>
+        {% for e in profile.career %}
+        <li class="walk-step" data-eng="{{ loop.index0 }}" style="{{ eng_tint(e) }}">
+          <p class="step-when">{{ eng_years(e) }}</p>
+          <h3>{{ e.label }}</h3>
+          {% if e.detail %}<p class="step-detail">{{ e.detail }}</p>{% endif %}
+          {% if e.skills %}<p class="step-skills">{{ e.skills | join(', ') }}</p>{% endif %}
+        </li>
+        {% endfor %}
+        <li class="walk-step step-frame step-outro" data-eng="">
+          <p class="step-when">All of it</p>
+          <h3>{{ profile.skills.values() | sum(start=[]) | length }} skills across {{ profile.career | length }} engagements</h3>
+          <p class="step-detail">Every engagement at once.<span class="fine-only"> Hover a line to see which skill it is.</span></p>
+        </li>
+      </ol>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if profile.skills %}
+  <section class="skills net-section reveal" aria-label="Skill network">
+    <h2 class="sec-title centered" style="--tint: var(--c2); --tint2: var(--c5)">Skill Network</h2>
+    <!-- Two clauses, each true under different conditions. The first is the
+         whole section with or without the canvas; the second names the filter,
+         which only does anything once the canvas is drawn. -->
+    <p class="skills-note">The same skills, grouped by discipline.<span class="net-live"> Pick a
+      discipline to pull it out of the web.</span></p>
+    <!-- The discipline filter. It came back when the network left the walk:
+         a control was only a problem while it sat under a sticky figure, where
+         a click ended the walk, and this panel no longer sticks. Hidden with the
+         canvas (no JS, reduced motion), where there is nothing to filter. -->
+    <ul class="skill-legend net-live" id="skill-legend">
+      <li><button type="button" class="legend-btn all" data-group="all" aria-pressed="true">All skills</button></li>
+      {% for group in profile.skills.keys() %}
+      <li style="--tint: {{ tints[loop.index0 % 6] }}"><button type="button" class="legend-btn" data-group="{{ loop.index0 }}" aria-pressed="true"><span class="swatch" aria-hidden="true"></span>{{ group }}</button></li>
+      {% endfor %}
+    </ul>
+    <div class="skill-net-wrap">
+      <!-- Nebula behind the network. It has to be a real element rather than
+           a background layer on the wrap: it drifts, and it is what the
+           canvas is lit against, so it needs to sit between the wrap's own
+           background and the (transparent) canvas. See styles.css for why it
+           is oversized. -->
+      <!-- Left empty on purpose: skillNet fills this with one blob per
+           discipline and drives each from its cluster's centroid. The count
+           has to match the number of skill groups, so it is built where that
+           number is known rather than duplicated here. -->
+      <div class="net-nebula" aria-hidden="true"></div>
+      <!-- The constellation cloud, between the nebula and the network. Same
+           contract as the masthead mount: app.js decides whether three.js
+           loads at all and removes this element if it cannot, so the markup
+           assumes nothing about it being filled. -->
+      <div class="net-cloud" id="net-3d" aria-hidden="true"><canvas></canvas></div>
+      <canvas id="skill-net" aria-hidden="true"></canvas>
+      <ul class="skills-fallback">
+        {% for group, members in profile.skills.items() %}
+          {% set gi = loop.index0 %}
+          {% for s in members %}<li style="--tint: {{ tints[gi % 6] }}">{{ s }}</li>{% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+    <!-- Emitted as an ordered [name, members] list, NOT an object: Jinja's
+         tojson sorts dict keys, which would silently re-order the groups and
+         mismatch every node color against the tints above. -->
+    <!-- Carries the nonce despite never executing: CSP gates the <script>
+         element itself, not the code inside it, so a non-executable type is
+         still refused and the network silently loses its data. -->
+    <script id="skills-data" type="application/json" nonce="{{ csp_nonce }}">{{ profile.skills.items() | list | tojson }}</script>
+  </section>
+  {% endif %}
+
+  {% if results_chart_svg and profile.results and profile.results.points %}
+  {% set r = profile.results %}
+  {% set two_axis = r.points | rejectattr('y', 'defined') | list | length == 0 %}
+  <section class="results reveal" aria-label="{{ r.title | default('Measured results', true) }}">
+    <h2 class="sec-title centered" style="--tint: var(--c3); --tint2: var(--c4)">{{ r.title | default('Measured results', true) }}</h2>
+    {% if r.note %}<p class="results-note">{{ r.note }}</p>{% endif %}
+    <div class="results-wrap">
+      <!-- Inlined for the same reason as the career arc: an external SVG cannot
+           read this page's variables. Built by tools/build_results_chart.py,
+           rerun it when the `results` block changes. -->
+      {{ results_chart_svg | safe }}
+    </div>
+    <!-- Not a debug view. Every mark is labeled on the chart, but the exact
+         values live here, and this is the readable path for anyone the figure
+         does not work for. -->
+    <details class="results-table">
+      <summary>View the numbers</summary>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">{{ r.point_label | default('Option', true) }}</th>
+            <th scope="col">{{ r.x_label | default('Value', true) }}</th>
+            {% if two_axis %}<th scope="col">{{ r.y_label | default('Second measure', true) }}</th>{% endif %}
+            <th scope="col">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in r.points %}
+          <tr>
+            <th scope="row">{{ p.label }}</th>
+            <td class="n">{{ p.x }}</td>
+            {% if two_axis %}<td class="n">{{ p.y }}</td>{% endif %}
+            <td>{{ p.note | default('', true) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if r.source %}<p class="src">Source: {{ r.source }}</p>{% endif %}
+    </details>
+  </section>
+  {% endif %}
+
+
+  {% if resume_html %}
+  <section class="resume reveal" aria-label="Resume">
+    <details id="resume-details">
+      <summary class="resume-head">
+        <span class="resume-title">Resume</span>
+        <span class="resume-toggle" aria-hidden="true">View full resume</span>
+        {# The owner's own PDF when profile.json names one, and the browser's
+           print-to-PDF when it does not, which is the state of any fork that has
+           not added a file. Either way the control sits inside <summary>, so
+           app.js stops its click from also toggling the panel. #}
+        {% if profile.resume_pdf %}
+        {# The download name is built from profile.json rather than from the
+           file's own path, so the saved copy lands in a recruiter's folder
+           under a name that says whose it is, and a fork gets its own. #}
+        <a id="resume-print" class="resume-print" href="{{ profile.resume_pdf }}?v={{ asset_v }}"
+           download="{{ profile.name | replace(' ', '_') }}_Resume.pdf">Download PDF</a>
+        {% else %}
+        <button type="button" id="resume-print" class="resume-print">Download PDF</button>
+        {% endif %}
+      </summary>
+      <div class="resume-body">
+        {{ resume_html | safe }}
+      </div>
+    </details>
+  </section>
+  {% endif %}
+
+  {# The contact form. Only rendered when the server can actually relay a message
+     (RESEND_API_KEY and CONTACT_TO both set), so a fork without them shows no
+     form rather than one that fails on submit.
+
+     It is hidden without scripting, not given a native POST: the CSP carries
+     `form-action 'none'`, so a scripting-off submit would be blocked by the
+     browser with nothing on screen to say so. Submitted by app.js over fetch,
+     which `connect-src 'self'` already allows.
+
+     The message goes to the owner's inbox and nowhere else: the assistant never
+     sees it and nothing is stored. See app/contact.py. #}
+  {% if contact_enabled %}
+  <section class="contact-card reveal" id="contact" aria-label="Contact {{ profile.known_as }}">
+    <h2>Get in touch</h2>
+    <p class="contact-note">
+      Leave a message and an email address or phone number, and {{ profile.known_as }} will get
+      back to you. It goes straight to {{ profile.known_as }}'s inbox. The assistant never sees
+      it, and nothing is stored on this site.
+    </p>
+    <form id="contact-form" class="contact-form" novalidate>
+      <label>Name
+        <input name="name" type="text" maxlength="200" autocomplete="name" required />
+      </label>
+      <div class="contact-row">
+        <label>Email
+          <input name="email" type="email" maxlength="200" autocomplete="email" />
+        </label>
+        <label>Phone
+          <input name="phone" type="tel" maxlength="200" autocomplete="tel" />
+        </label>
+      </div>
+      <label>Message
+        <textarea name="message" rows="5" maxlength="3000" required></textarea>
+      </label>
+      {# Honeypot. Off screen, out of the tab order and the accessibility tree,
+         so only a bot filling every field reaches it. #}
+      <div class="contact-trap" aria-hidden="true">
+        <label>Website <input name="website" type="text" tabindex="-1" autocomplete="off" /></label>
+      </div>
+      <div class="contact-foot">
+        <p id="contact-status" class="contact-status" role="status" aria-live="polite"></p>
+        <button id="contact-send" type="submit">Send</button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+
+  <footer class="foot">
+    <p>Built with an open source resume chatbot template. FastAPI, LangChain, and
+      {{ model_name }} on Groq, with a retrieval plus draft and judge pipeline.</p>
+  </footer>
+</main>
+
+<script src="/static/app.js?v={{ asset_v }}"></script>
+</body>
+</html>

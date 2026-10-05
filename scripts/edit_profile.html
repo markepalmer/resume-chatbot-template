@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>profile.json editor</title>
+<style>
+  /* Local dev tooling, so this is deliberately not the site's stylesheet: it
+     shares no tokens with static/styles.css and must never be mistaken for a
+     preview of the page. It is a form over a JSON file. */
+  :root {
+    --bg: #14161c; --panel: #1b1e26; --line: #2c3040; --ink: #e6e8ef;
+    --dim: #9aa1b4; --accent: #8ab4ff; --warn: #f0b64b; --ok: #6cc38f;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5; background: rgba(20,22,28,.94);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+    padding: 12px 20px; display: flex; gap: 14px; align-items: center;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .path { color: var(--dim); font-size: 12px; font-family: ui-monospace, monospace; }
+  header .spacer { flex: 1; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  section {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px;
+  }
+  section > h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--dim); margin: 0 0 4px;
+  }
+  section > .hint { color: var(--dim); font-size: 12.5px; margin: 0 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  .grid.three { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+  input, textarea, select {
+    width: 100%; background: #12141a; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px;
+    font: inherit;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  textarea { min-height: 64px; resize: vertical; }
+  .row {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px; margin-bottom: 10px; background: #171a21;
+  }
+  .row-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .row-head strong { font-size: 13px; }
+  .row-head .spacer { flex: 1; }
+  button {
+    background: #232735; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 11px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #0d1220; border-color: var(--accent); font-weight: 600; }
+  button.danger:hover { border-color: #e06c6c; color: #e06c6c; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px;
+    border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+    font-size: 12.5px; background: #12141a; user-select: none;
+  }
+  .chip input { width: auto; margin: 0; }
+  .chip.on { border-color: var(--accent); color: var(--accent); }
+  .chip.orphan { border-color: var(--warn); color: var(--warn); }
+  .checks { margin-top: 10px; }
+  .check { border-left: 3px solid var(--warn); padding: 8px 12px; margin-bottom: 8px; background: #1e1b14; border-radius: 0 6px 6px 0; }
+  .check b { color: var(--warn); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .check pre { margin: 6px 0 0; white-space: pre-wrap; font-size: 12.5px; color: var(--ink); font-family: ui-monospace, monospace; }
+  .clean { color: var(--ok); font-size: 12.5px; }
+  #status { font-size: 12.5px; color: var(--dim); }
+  #status.ok { color: var(--ok); }
+  #status.err { color: #e06c6c; }
+  .stack > * + * { margin-top: 12px; }
+  @media (max-width: 760px) { .grid, .grid.three { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>profile.json</h1>
+  <span class="path" id="path"></span>
+  <span class="spacer"></span>
+  <span id="status">loading…</span>
+  <button class="primary" id="save">Save &amp; rebuild figures</button>
+</header>
+
+<div class="wrap" id="app" hidden>
+
+  <section>
+    <h2>Identity</h2>
+    <p class="hint">The masthead. <code>known_as</code> is the informal name the chatbot uses when it answers.</p>
+    <div class="grid stack-none">
+      <div><label>Full name</label><input data-key="name"></div>
+      <div><label>Known as</label><input data-key="known_as"></div>
+      <div><label>Role / title</label><input data-key="role"></div>
+      <div><label>Location</label><input data-key="location"></div>
+      <div><label>Email (blank keeps it off the page)</label><input data-key="email"></div>
+      <div><label>Photo path</label><input data-key="photo" placeholder="/static/photo.jpg"></div>
+    </div>
+    <div style="margin-top:12px"><label>Tagline</label><textarea data-key="tagline"></textarea></div>
+  </section>
+
+  <section>
+    <h2>Masthead bio</h2>
+    <p class="hint">The rows under your name. Leave all three empty to fall back to the tagline.</p>
+    <div class="stack">
+      <div><label>Credential line</label><input data-bio="meta"></div>
+      <div>
+        <label>Middle row — things you have shipped, two to four, each short</label>
+        <div id="lead"></div>
+        <button data-add="lead">Add item</button>
+      </div>
+      <div><label>Closing line</label><input data-bio="close"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Links</h2>
+    <p class="hint">The buttons under the masthead.</p>
+    <div id="links"></div>
+    <button data-add="links">Add link</button>
+  </section>
+
+  <section>
+    <h2>Skills</h2>
+    <p class="hint">
+      One group per discipline, each its own colour in the network. Members here are
+      the only names a career entry can use, which is why the career section picks
+      from them rather than asking you to retype them.
+    </p>
+    <div id="skills"></div>
+    <button data-add="skills">Add group</button>
+    <span class="hint" id="skillcount" style="margin-left:10px"></span>
+  </section>
+
+  <section>
+    <h2>Career</h2>
+    <p class="hint">
+      One entry per engagement, newest last. Dates are <code>YYYY-MM</code>.
+      Skills are checkboxes over your groups above, so an entry cannot name a
+      skill that does not exist: a mismatch draws one fewer chord on the arc and
+      says nothing when it does.
+    </p>
+    <div id="career"></div>
+    <button data-add="career">Add engagement</button>
+  </section>
+
+  <section>
+    <h2>Highlights</h2>
+    <p class="hint">The project carousel. A card with a <code>url</code> becomes a link. The stat rides on its own card.</p>
+    <div id="highlights"></div>
+    <button data-add="highlights">Add card</button>
+  </section>
+
+  <section>
+    <h2>Flat stat band</h2>
+    <p class="hint">
+      Only used when no highlight card carries a stat. <b>Prefix and suffix sit
+      hard against the number</b> with no space, so they are for <code>$</code>,
+      <code>~</code> or <code>%</code>, not for words.
+    </p>
+    <div id="stats"></div>
+    <button data-add="stats">Add stat</button>
+  </section>
+
+  <section>
+    <h2>Starter questions</h2>
+    <p class="hint">The suggestion chips under the chat.</p>
+    <div id="starter_questions"></div>
+    <button data-add="starter_questions">Add question</button>
+  </section>
+
+  <section>
+    <h2>Masthead forms</h2>
+    <p class="hint">The shapes the header cloud cycles through, in order.</p>
+    <div class="chips" id="forms"></div>
+  </section>
+
+  <section>
+    <h2>Checks</h2>
+    <p class="hint">The same checks the CLI runs, run here while you type instead of after you finish.</p>
+    <div class="checks" id="checks"></div>
+  </section>
+
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get("token") || "";
+const $ = (id) => document.getElementById(id);
+let state = {};   // the whole file, mutated in place so keys we do not manage survive
+let meta = {};
+
+const api = async (path, body) => {
+  const res = await fetch(path, {
+    method: body ? "POST" : "GET",
+    headers: { "X-Edit-Token": TOKEN, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error((await res.json()).error || res.status);
+  return res.json();
+};
+
+const setStatus = (text, kind) => {
+  const el = $("status");
+  el.textContent = text;
+  el.className = kind || "";
+};
+
+/* --- small builders ---------------------------------------------------- */
+const el = (tag, props = {}, kids = []) => {
+  const n = document.createElement(tag);
+  Object.entries(props).forEach(([k, v]) => {
+    if (k === "class") n.className = v;
+    else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== undefined && v !== null) n.setAttribute(k, v);
+  });
+  (Array.isArray(kids) ? kids : [kids]).forEach((k) => k && n.append(k));
+  return n;
+};
+
+const field = (label, value, oninput, placeholder) =>
+  el("div", {}, [
+    el("label", {}, label),
+    el("input", { value: value ?? "", placeholder: placeholder || "", oninput }),
+  ]);
+
+const rowShell = (title, onRemove, body) =>
+  el("div", { class: "row" }, [
+    el("div", { class: "row-head" }, [
+      el("strong", {}, title),
+      el("span", { class: "spacer" }),
+      el("button", { class: "danger", onclick: onRemove }, "Remove"),
+    ]),
+    body,
+  ]);
+
+/* --- sections ---------------------------------------------------------- */
+function renderLead() {
+  const host = $("lead");
+  host.textContent = "";
+  const lead = (state.bio ||= {}).lead ||= [];
+  lead.forEach((item, i) => {
+    host.append(el("div", { class: "row" }, [
+      el("div", { class: "row-head" }, [
+        el("input", { value: item, oninput: (e) => { lead[i] = e.target.value; touch(); } }),
+        el("button", { class: "danger", onclick: () => { lead.splice(i, 1); renderLead(); touch(); } }, "Remove"),
+      ]),
+    ]));
+  });
+}
+
+function renderLinks() {
+  const host = $("links");
+  host.textContent = "";
+  const links = state.links ||= [];
+  links.forEach((link, i) => {
+    host.append(rowShell(link.label || "Link", () => { links.splice(i, 1); renderLinks(); touch(); },
+      el("div", { class: "grid" }, [
+        field("Label", link.label, (e) => { link.label = e.target.value; touch(); }),
+        field("URL", link.url, (e) => { link.url = e.target.value; touch(); }),
+      ])));
+  });
+}
+
+function renderSkills() {
+  const host = $("skills");
+  host.textContent = "";
+  const skills = state.skills ||= {};
+  Object.entries(skills).forEach(([group, members]) => {
+    host.append(rowShell(group || "(unnamed group)",
+      () => { delete skills[group]; renderSkills(); renderCareer(); touch(); },
+      el("div", { class: "stack" }, [
+        field("Group name", group, (e) => {
+          const next = e.target.value;
+          const entries = Object.entries(skills);
+          const rebuilt = {};
+          entries.forEach(([k, v]) => { rebuilt[k === group ? next : k] = v; });
+          state.skills = rebuilt;
+          touch();
+        }),
+        el("div", {}, [
+          el("label", {}, "Members, comma separated"),
+          el("input", {
+            value: members.join(", "),
+            oninput: (e) => {
+              skills[group] = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+              renderCareer();
+              touch();
+            },
+          }),
+        ]),
+      ])));
+  });
+  const groups = Object.keys(skills).length;
+  $("skillcount").textContent =
+    `${groups} group${groups === 1 ? "" : "s"}; past ${meta.max_skill_groups} the colours repeat in both figures.`;
+}
+
+const allSkills = () => Object.values(state.skills || {}).flat();
+
+function renderCareer() {
+  const host = $("career");
+  host.textContent = "";
+  const career = state.career ||= [];
+  const known = allSkills();
+  career.forEach((entry, i) => {
+    const picked = entry.skills ||= [];
+    const orphans = picked.filter((s) => !known.includes(s));
+    const chips = el("div", { class: "chips" });
+    known.forEach((skill) => {
+      const on = picked.includes(skill);
+      chips.append(el("label", { class: "chip" + (on ? " on" : "") }, [
+        el("input", {
+          type: "checkbox", ...(on ? { checked: "checked" } : {}),
+          onchange: (e) => {
+            if (e.target.checked) picked.push(skill);
+            else picked.splice(picked.indexOf(skill), 1);
+            renderCareer();
+            touch();
+          },
+        }),
+        skill,
+      ]));
+    });
+    orphans.forEach((skill) => {
+      chips.append(el("label", { class: "chip orphan", title: "In this entry but in no skills group, so it draws no chord" }, [
+        el("input", {
+          type: "checkbox", checked: "checked",
+          onchange: () => { picked.splice(picked.indexOf(skill), 1); renderCareer(); touch(); },
+        }),
+        skill + " — in no group",
+      ]));
+    });
+
+    host.append(rowShell(entry.label || "(unnamed engagement)",
+      () => { career.splice(i, 1); renderCareer(); touch(); },
+      el("div", { class: "stack" }, [
+        el("div", { class: "grid" }, [
+          field("Label", entry.label, (e) => { entry.label = e.target.value; touch(); }),
+          field("Detail (employer, school, or what it was)", entry.detail, (e) => { entry.detail = e.target.value; touch(); }),
+        ]),
+        el("div", { class: "grid three" }, [
+          field("Start (YYYY-MM)", entry.start, (e) => { entry.start = e.target.value; touch(); }, "2022-08"),
+          field("End (YYYY-MM)", entry.end, (e) => { entry.end = e.target.value; touch(); }, "2026-05"),
+          el("div", {}, [
+            el("label", {}, "Kind"),
+            el("select", {
+              onchange: (e) => { entry.kind = e.target.value; touch(); },
+            }, meta.kinds.map((k) => el("option", {
+              value: k, ...(entry.kind === k ? { selected: "selected" } : {}),
+            }, k))),
+          ]),
+        ]),
+        el("div", {}, [el("label", {}, "Skills used"), chips]),
+      ])));
+  });
+}
+
+function renderHighlights() {
+  const host = $("highlights");
+  host.textContent = "";
+  const cards = state.highlights ||= [];
+  cards.forEach((card, i) => {
+    const stat = card.stat || {};
+    host.append(rowShell(card.title || "(untitled card)",
+      () => { cards.splice(i, 1); renderHighlights(); touch(); },
+      el("div", { class: "stack" }, [
+        el("div", { class: "grid" }, [
+          field("Title", card.title, (e) => { card.title = e.target.value; touch(); }),
+          field("URL (optional, makes the card a link)", card.url, (e) => {
+            const v = e.target.value.trim();
+            if (v) card.url = v; else delete card.url;
+            touch();
+          }),
+        ]),
+        el("div", {}, [
+          el("label", {}, "Body"),
+          el("textarea", { oninput: (e) => { card.body = e.target.value; touch(); } }, card.body || ""),
+        ]),
+        el("div", { class: "grid three" }, [
+          field("Stat value (number, blank for none)", stat.value, (e) => {
+            const v = e.target.value.trim();
+            if (v === "") { delete card.stat; renderHighlights(); touch(); return; }
+            card.stat = { ...stat, value: Number(v) };
+            touch();
+          }),
+          field("Prefix — $ or ~, not a word", stat.prefix, (e) => {
+            card.stat = { ...(card.stat || {}), prefix: e.target.value }; touch();
+          }),
+          field("Suffix — % or +, not a word", stat.suffix, (e) => {
+            card.stat = { ...(card.stat || {}), suffix: e.target.value }; touch();
+          }),
+        ]),
+        field("Stat label", stat.label, (e) => {
+          card.stat = { ...(card.stat || {}), label: e.target.value }; touch();
+        }),
+      ])));
+  });
+}
+
+function renderStats() {
+  const host = $("stats");
+  host.textContent = "";
+  const stats = state.stats ||= [];
+  const carded = (state.highlights || []).some((c) => c.stat);
+  host.append(el("p", { class: "hint" },
+    carded ? "A highlight card already carries a stat, so this flat list is ignored."
+           : "No card carries a stat, so this list is what the band renders."));
+  stats.forEach((s, i) => {
+    host.append(rowShell(s.label || "(stat)", () => { stats.splice(i, 1); renderStats(); touch(); },
+      el("div", { class: "grid" }, [
+        field("Value (number)", s.value, (e) => { s.value = Number(e.target.value); touch(); }),
+        field("Label", s.label, (e) => { s.label = e.target.value; touch(); }),
+        field("Prefix — $ or ~, not a word", s.prefix, (e) => { s.prefix = e.target.value; touch(); }),
+        field("Suffix — % or +, not a word", s.suffix, (e) => { s.suffix = e.target.value; touch(); }),
+      ])));
+  });
+}
+
+function renderStarters() {
+  const host = $("starter_questions");
+  host.textContent = "";
+  const qs = state.starter_questions ||= [];
+  qs.forEach((q, i) => {
+    host.append(el("div", { class: "row" }, [
+      el("div", { class: "row-head" }, [
+        el("input", { value: q, oninput: (e) => { qs[i] = e.target.value; touch(); } }),
+        el("button", { class: "danger", onclick: () => { qs.splice(i, 1); renderStarters(); touch(); } }, "Remove"),
+      ]),
+    ]));
+  });
+}
+
+function renderForms() {
+  const host = $("forms");
+  host.textContent = "";
+  const chosen = state.masthead_forms ||= [...(meta.default_masthead_forms || [])];
+  Object.entries(meta.masthead_forms || {}).forEach(([name, desc]) => {
+    const at = chosen.indexOf(name);
+    const on = at !== -1;
+    host.append(el("label", { class: "chip" + (on ? " on" : ""), title: desc }, [
+      el("input", {
+        type: "checkbox", ...(on ? { checked: "checked" } : {}),
+        onchange: (e) => {
+          if (e.target.checked) chosen.push(name);
+          else chosen.splice(chosen.indexOf(name), 1);
+          renderForms();
+          touch();
+        },
+      }),
+      on ? `${at + 1}. ${name}` : name,
+    ]));
+  });
+}
+
+/* --- validation and save ------------------------------------------------ */
+let timer = null;
+function touch() {
+  setStatus("unsaved changes");
+  clearTimeout(timer);
+  timer = setTimeout(runChecks, 400);
+}
+
+async function runChecks() {
+  try {
+    const { checks } = await api("/api/validate", { profile: state });
+    paintChecks(checks);
+  } catch (e) { setStatus(String(e.message || e), "err"); }
+}
+
+function paintChecks(checks) {
+  const host = $("checks");
+  host.textContent = "";
+  if (!checks.length) {
+    host.append(el("p", { class: "clean" }, "Nothing to report."));
+    return;
+  }
+  checks.forEach((c) => host.append(el("div", { class: "check" }, [
+    el("b", {}, c.label), el("pre", {}, c.text),
+  ])));
+}
+
+$("save").addEventListener("click", async () => {
+  setStatus("saving…");
+  try {
+    const out = await api("/api/save", { profile: state });
+    paintChecks(out.checks);
+    setStatus(`saved ${out.written}`, "ok");
+    if (out.builders) console.log(out.builders);
+  } catch (e) { setStatus(String(e.message || e), "err"); }
+});
+
+/* --- boot --------------------------------------------------------------- */
+(async () => {
+  try {
+    const data = await api("/api/profile");
+    state = data.profile;
+    meta = data.meta;
+    $("path").textContent = meta.path;
+    document.querySelectorAll("[data-key]").forEach((input) => {
+      const key = input.dataset.key;
+      input.value = state[key] ?? "";
+      input.addEventListener("input", () => { state[key] = input.value; touch(); });
+    });
+    document.querySelectorAll("[data-bio]").forEach((input) => {
+      const key = input.dataset.bio;
+      input.value = (state.bio || {})[key] ?? "";
+      input.addEventListener("input", () => { (state.bio ||= {})[key] = input.value; touch(); });
+    });
+    const adders = {
+      lead: () => { (state.bio ||= {}).lead ||= []; state.bio.lead.push(""); renderLead(); },
+      links: () => { (state.links ||= []).push({ label: "", url: "" }); renderLinks(); },
+      skills: () => { (state.skills ||= {})["New group"] = []; renderSkills(); renderCareer(); },
+      career: () => {
+        (state.career ||= []).push({ label: "", detail: "", kind: meta.kinds[0], start: "", end: "", skills: [] });
+        renderCareer();
+      },
+      highlights: () => { (state.highlights ||= []).push({ title: "", body: "" }); renderHighlights(); },
+      stats: () => { (state.stats ||= []).push({ value: 0, label: "", prefix: "", suffix: "" }); renderStats(); },
+      starter_questions: () => { (state.starter_questions ||= []).push(""); renderStarters(); },
+    };
+    document.querySelectorAll("[data-add]").forEach((btn) => {
+      btn.addEventListener("click", () => { adders[btn.dataset.add](); touch(); });
+    });
+    renderLead(); renderLinks(); renderSkills(); renderCareer();
+    renderHighlights(); renderStats(); renderStarters(); renderForms();
+    $("app").hidden = false;
+    setStatus("loaded");
+    runChecks();
+  } catch (e) {
+    setStatus("could not load: " + (e.message || e), "err");
+  }
+})();
+</script>
+</body>
+</html>

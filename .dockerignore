@@ -1,0 +1,20 @@
+.env
+.venv
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+HANDOFF.md
+README.md
+.DS_Store
+
+# Test-only material. Belt and braces: every COPY in the Dockerfile is explicit
+# (requirements.lock, app/, knowledge/, templates/, static/, profile.json), so
+# none of this can reach the image today. That is a property of the Dockerfile
+# rather than a rule, and a single future `COPY . .` would remove it silently
+# and ship the test runner, the suite, and pytest's config in the image.
+tests/
+pytest.ini
+requirements-dev.txt
+.pytest_cache/

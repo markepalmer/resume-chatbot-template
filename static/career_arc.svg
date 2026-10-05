@@ -1,0 +1,98 @@
+<svg class="career-arc" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 1160" role="img" aria-label="Radial diagram linking each engagement to the skills it used">
+<g class="rule">
+<path class="rule-arc" d="M 406.45 373.17 A 270 270 0 0 1 845.9 533.11"/>
+<line x1="449.22" y1="358.76" x2="442.61" y2="347.57"/>
+<text x="457.87" y="373.4" text-anchor="middle" dominant-baseline="middle">2022</text>
+<line x1="569.45" y1="323.22" x2="568.92" y2="310.23"/>
+<text x="570.15" y="340.2" text-anchor="middle" dominant-baseline="middle">2023</text>
+<line x1="692.19" y1="348.78" x2="697.86" y2="337.08"/>
+<text x="684.77" y="364.07" text-anchor="middle" dominant-baseline="middle">2024</text>
+<line x1="788.23" y1="429.37" x2="798.76" y2="421.75"/>
+<text x="774.45" y="439.33" text-anchor="middle" dominant-baseline="middle">2025</text>
+</g>
+<g class="arcs">
+<path class="arc k-edu" data-eng="0" style="--i:0;--shade:100%" d="M 442.52 245.66 Q 613.09 537.29 938.08 629.59"><title>Portland State University → Python</title></path>
+<path class="arc k-edu" data-eng="0" style="--i:1;--shade:100%" d="M 660.96 227.68 Q 540.11 511.89 233.11 478.26"><title>Portland State University → Algorithms</title></path>
+<path class="arc k-edu" data-eng="0" style="--i:2;--shade:100%" d="M 849.64 339.21 Q 590.7 589.22 381.69 882.25"><title>Portland State University → Databases</title></path>
+<path class="arc k-work" data-eng="1" style="--i:3;--shade:100%" d="M 672.23 248.08 Q 647.55 537.65 938.08 629.59"><title>Cascade Freight → Python</title></path>
+<path class="arc k-work" data-eng="1" style="--i:4;--shade:100%" d="M 740.48 275.16 Q 602.43 588.47 569.08 941.34"><title>Cascade Freight → PostgreSQL</title></path>
+<path class="arc k-work" data-eng="1" style="--i:5;--shade:100%" d="M 801.44 316.1 Q 596.91 592.13 471.29 924.77"><title>Cascade Freight → Airflow</title></path>
+<path class="arc k-work" data-eng="1" style="--i:6;--shade:100%" d="M 852.34 369.02 Q 576.96 580.2 287.4 792.29"><title>Cascade Freight → Docker</title></path>
+<path class="arc k-work" data-eng="1" style="--i:7;--shade:100%" d="M 890.86 431.53 Q 575.74 576.45 240.72 704.78"><title>Cascade Freight → Observability</title></path>
+<path class="arc k-proj" data-eng="2" style="--i:8;--shade:62%" d="M 730.48 289.12 Q 656.28 543.81 938.08 629.59"><title>Ingestion pipeline rebuild → Python</title></path>
+<path class="arc k-proj" data-eng="2" style="--i:9;--shade:62%" d="M 745.2 297.22 Q 603.14 591.78 569.08 941.34"><title>Ingestion pipeline rebuild → PostgreSQL</title></path>
+<path class="arc k-proj" data-eng="2" style="--i:10;--shade:62%" d="M 759.5 306.07 Q 590.62 590.63 471.29 924.77"><title>Ingestion pipeline rebuild → Airflow</title></path>
+<path class="arc k-proj" data-eng="2" style="--i:11;--shade:62%" d="M 773.31 315.64 Q 626.69 591.61 697.92 921.73"><title>Ingestion pipeline rebuild → Idempotency</title></path>
+<path class="arc k-proj" data-eng="3" style="--i:12;--shade:74.67%" d="M 807.98 344.88 Q 663.87 566.49 911.13 725.04"><title>Job scheduler → Go</title></path>
+<path class="arc k-proj" data-eng="3" style="--i:13;--shade:74.67%" d="M 822.03 359.36 Q 614.67 601.1 569.08 941.34"><title>Job scheduler → PostgreSQL</title></path>
+<path class="arc k-proj" data-eng="3" style="--i:14;--shade:74.67%" d="M 835.15 374.68 Q 649.23 593.73 786.35 876.82"><title>Job scheduler → Concurrency</title></path>
+<path class="arc k-proj" data-eng="3" style="--i:15;--shade:74.67%" d="M 847.3 390.78 Q 566.03 555.8 219.58 607.88"><title>Job scheduler → Testing</title></path>
+<path class="arc k-proj" data-eng="4" style="--i:16;--shade:87.33%" d="M 863.62 416.25 Q 620.91 609.64 569.08 941.34"><title>Zero downtime migration → PostgreSQL</title></path>
+<path class="arc k-proj" data-eng="4" style="--i:17;--shade:87.33%" d="M 870.11 428.03 Q 677.23 564.64 938.08 629.59"><title>Zero downtime migration → Python</title></path>
+<path class="arc k-proj" data-eng="4" style="--i:18;--shade:87.33%" d="M 876.1 440.07 Q 570.35 563.19 219.58 607.88"><title>Zero downtime migration → Testing</title></path>
+<path class="arc k-proj" data-eng="4" style="--i:19;--shade:87.33%" d="M 881.6 452.35 Q 574.35 579.57 240.72 704.78"><title>Zero downtime migration → Observability</title></path>
+<path class="arc k-proj" data-eng="5" style="--i:20;--shade:100%" d="M 923.35 466.88 Q 685.21 570.47 938.08 629.59"><title>Resume chatbot → Python</title></path>
+<path class="arc k-proj" data-eng="5" style="--i:21;--shade:100%" d="M 927.7 481.07 Q 674.04 599.6 859.25 809.57"><title>Resume chatbot → FastAPI</title></path>
+<path class="arc k-proj" data-eng="5" style="--i:22;--shade:100%" d="M 931.47 495.43 Q 586.79 538.49 273.82 387.82"><title>Resume chatbot → RAG</title></path>
+<path class="arc k-proj" data-eng="5" style="--i:23;--shade:100%" d="M 934.64 509.93 Q 589.31 601.33 287.4 792.29"><title>Resume chatbot → Docker</title></path>
+</g>
+<g class="rim">
+<path class="seg k-edu" data-eng="0" style="--shade:100%" d="M 343.45 298.1 A 368 368 0 0 1 915.88 429.63"><title>Portland State University · B.S. Computer Science</title></path>
+<path class="seg k-work" data-eng="1" style="--shade:100%" d="M 637.4 233.72 A 351 351 0 0 1 911.05 463.34"><title>Cascade Freight · Backend Engineer, data platform</title></path>
+<path class="seg k-proj" data-eng="2" style="--shade:62%" d="M 725.8 279.5 A 334 334 0 0 1 784.01 315.54"><title>Ingestion pipeline rebuild · Nightly batch to incremental, idempotent writes</title></path>
+<path class="seg k-proj" data-eng="3" style="--shade:74.67%" d="M 805.01 333.17 A 334 334 0 0 1 858.42 395.51"><title>Job scheduler · Advisory locks and a claim table for exactly-once runs</title></path>
+<path class="seg k-proj" data-eng="4" style="--shade:87.33%" d="M 865.76 407.1 A 334 334 0 0 1 890.19 456.15"><title>Zero downtime migration · Dual write and backfill across 90M rows</title></path>
+<path class="seg k-proj" data-eng="5" style="--shade:100%" d="M 927.08 457.69 A 368 368 0 0 1 942.41 516.1"><title>Resume chatbot · Grounded RAG over my own background</title></path>
+</g>
+<g class="skill-ring">
+<circle class="dot t1" data-eng="0 1 2 4 5" cx="944.52" cy="630.48" r="4"/>
+<text class="skill-label t1" data-eng="0 1 2 4 5" x="956.41" y="632.13" text-anchor="start" dominant-baseline="middle" transform="rotate(7.88 956.41 632.13)">Python</text>
+<circle class="dot t1" data-eng="3" cx="917.08" cy="727.65" r="4"/>
+<text class="skill-label t1" data-eng="3" x="928.07" y="732.46" text-anchor="start" dominant-baseline="middle" transform="rotate(23.65 928.07 732.46)">Go</text>
+<circle class="dot t1" data-eng="5" cx="864.27" cy="813.7" r="4"/>
+<text class="skill-label t1" data-eng="5" x="873.54" y="821.32" text-anchor="start" dominant-baseline="middle" transform="rotate(39.42 873.54 821.32)">FastAPI</text>
+<circle class="dot t1" data-eng="3" cx="790.06" cy="882.15" r="4"/>
+<text class="skill-label t1" data-eng="3" x="796.91" y="892.01" text-anchor="start" dominant-baseline="middle" transform="rotate(55.19 796.91 892.01)">Concurrency</text>
+<circle class="dot t1" data-eng="2" cx="700.04" cy="927.87" r="4"/>
+<text class="skill-label t1" data-eng="2" x="703.96" y="939.21" text-anchor="start" dominant-baseline="middle" transform="rotate(70.96 703.96 939.21)">Idempotency</text>
+<circle class="dot t2" data-eng="1 2 3 4" cx="568.89" cy="947.83" r="4"/>
+<text class="skill-label t2" data-eng="1 2 3 4" x="568.52" y="959.83" text-anchor="end" dominant-baseline="middle" transform="rotate(271.73 568.52 959.83)">PostgreSQL</text>
+<circle class="dot t2" data-eng="1 2" cx="469.34" cy="930.97" r="4"/>
+<text class="skill-label t2" data-eng="1 2" x="465.73" y="942.41" text-anchor="end" dominant-baseline="middle" transform="rotate(287.5 465.73 942.41)">Airflow</text>
+<circle class="dot t2" data-eng="0" cx="378.12" cy="887.69" r="4"/>
+<text class="skill-label t2" data-eng="0" x="371.54" y="897.72" text-anchor="end" dominant-baseline="middle" transform="rotate(303.27 371.54 897.72)">Databases</text>
+<circle class="dot t3" data-eng="1 5" cx="282.14" cy="796.11" r="4"/>
+<text class="skill-label t3" data-eng="1 5" x="272.42" y="803.15" text-anchor="end" dominant-baseline="middle" transform="rotate(324.04 272.42 803.15)">Docker</text>
+<circle class="dot t3" data-eng="1 4" cx="234.62" cy="707.02" r="4"/>
+<text class="skill-label t3" data-eng="1 4" x="223.36" y="711.17" text-anchor="end" dominant-baseline="middle" transform="rotate(339.81 223.36 711.17)">Observability</text>
+<circle class="dot t3" data-eng="3 4" cx="213.1" cy="608.38" r="4"/>
+<text class="skill-label t3" data-eng="3 4" x="201.13" y="609.31" text-anchor="end" dominant-baseline="middle" transform="rotate(355.58 201.13 609.31)">Testing</text>
+<circle class="dot t4" data-eng="0" cx="226.87" cy="476.43" r="4"/>
+<text class="skill-label t4" data-eng="0" x="215.36" y="473.05" text-anchor="end" dominant-baseline="middle" transform="rotate(376.35 215.36 473.05)">Algorithms</text>
+<circle class="dot t4" data-eng="5" cx="268.31" cy="384.36" r="4"/>
+<text class="skill-label t4" data-eng="5" x="258.15" y="377.98" text-anchor="end" dominant-baseline="middle" transform="rotate(392.12 258.15 377.98)">RAG</text>
+</g>
+<g class="seg-labels">
+<g class="seg-label k-edu" data-eng="0" style="--shade:100%"><text class="sl-name" x="461.37" y="152.36">Portland State University</text><text class="sl-yrs" x="461.37" y="178.36">2021–2025</text></g>
+<g class="seg-label k-work" data-eng="1" style="--shade:100%"><text class="sl-name" x="842.26" y="237.45">Cascade Freight</text><text class="sl-yrs" x="842.26" y="263.45">2023–2025</text></g>
+<g class="seg-label k-proj" data-eng="2" style="--shade:62%"><text class="sl-name" x="699.2" y="203.11">Ingestion pipeline rebuild</text><text class="sl-yrs" x="699.2" y="229.11">2024</text></g>
+<g class="seg-label k-proj" data-eng="3" style="--shade:74.67%"><text class="sl-name" x="889.84" y="284.55">Job scheduler</text><text class="sl-yrs" x="889.84" y="310.55">2024–2025</text></g>
+<g class="seg-label k-proj" data-eng="4" style="--shade:87.33%"><text class="sl-name" x="749.6" y="368.14">Zero downtime migration</text><text class="sl-yrs" x="749.6" y="394.14">2025</text></g>
+<g class="seg-label k-proj" data-eng="5" style="--shade:100%"><text class="sl-name" x="900.8" y="446.43">Resume chatbot</text><text class="sl-yrs" x="900.8" y="472.43">2025</text></g>
+</g>
+<g class="guide">
+<g class="g-pill"><rect x="366" y="406" width="428" height="48" rx="24"/><text x="580" y="430" text-anchor="middle" dominant-baseline="central">Time runs left to right →</text></g>
+<g class="g-pill"><rect x="248.4" y="596" width="663.2" height="48" rx="24"/><text x="580" y="620" text-anchor="middle" dominant-baseline="central">Each line is one skill used on that band</text></g>
+<g class="g-pill"><rect x="326.8" y="806" width="506.4" height="48" rx="24"/><text x="580" y="830" text-anchor="middle" dominant-baseline="central">↓ Skills sit around the bottom</text></g>
+</g>
+<g class="hub">
+<text class="hub-k" x="48" y="80">13 skills across 6 engagements</text>
+<text class="hub-k" x="48" y="106">4.2 years, 2021 to 2025</text>
+<line class="key-swatch k-edu" x1="48" y1="145" x2="76" y2="145"/>
+<text class="hub-k" x="86" y="150">Education</text>
+<line class="key-swatch k-work" x1="48" y1="169" x2="76" y2="169"/>
+<text class="hub-k" x="86" y="174">Work</text>
+<line class="key-swatch k-proj" x1="48" y1="193" x2="76" y2="193"/>
+<text class="hub-k" x="86" y="198">Projects</text>
+</g>
+</svg>

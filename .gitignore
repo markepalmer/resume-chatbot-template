@@ -1,0 +1,18 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.pytest_cache/
+
+# evals/results/ is deliberately NOT ignored. A probe or eval run is evidence
+# for a model-selection decision, and the decision is only defensible if the
+# numbers behind it are in the history next to it.
+
+# Agent tooling, ignored for now rather than on principle. settings.local.json
+# is a local permissions override and belongs to this machine either way, but
+# .claude/skills/ is project tooling and is a real decision that has been
+# deferred, not made. Revisit before the repo goes public: shipping it says
+# something about how the site was built, and so does leaving it out.
+.claude/

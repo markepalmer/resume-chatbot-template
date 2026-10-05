@@ -1,0 +1,3123 @@
+/* ==========================================================================
+   Theme tokens
+
+   Two themes share one variable contract. The six --c1..--c6 spectrum colors
+   are the spine of the whole design: skill groups, highlight cards, stat
+   tiles, chat accents and the neural network canvas all index into them, so a
+   skill keeps the same color everywhere it appears on the page.
+
+   JS reads these off :root with getComputedStyle, so the canvas repaints in
+   whichever theme is active. Never hardcode a spectrum color outside this
+   block.
+   ========================================================================== */
+:root {
+  --c1: #4d8dff; /* blue    */
+  --c2: #a97bff; /* violet  */
+  --c3: #22d3c5; /* teal    */
+  --c4: #ffa23a; /* amber   */
+  --c5: #ff5f9e; /* pink    */
+  --c6: #5ce07f; /* green   */
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --maxw: 940px;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dark is the default: the network glows against it and the spectrum reads
+   loudest here. */
+:root,
+:root[data-theme="dark"] {
+  --bg: #080a12;
+  --paper: #0d1019;
+  --card: rgba(22, 26, 40, 0.72);
+  --card-solid: #161a28;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --ink: #eef1f8;
+  --ink-soft: #99a3ba;
+  --ink-faint: #6b768f;
+  --halo: rgba(8, 10, 18, 0.86); /* canvas label halo */
+  --shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.9);
+  --glass: blur(14px) saturate(140%);
+  --aurora-a: 0.5;
+  /* Nebula behind the skill network. Higher than the aurora because it is
+     clipped to a panel rather than spread over the viewport, and it has to read
+     through the network drawn on top of it. */
+  --nebula-a: 0.62;
+  /* The nebula's own hue, deliberately NOT one of --c1..--c6.
+     In this figure color means discipline: every neuron and every legend chip is
+     tinted from that scale. The nebula used to paint --c2, --c3 and --c5, which
+     put three discipline colors as diffuse light behind nodes encoded in those
+     same three colors. Three hues read as categories; one hue reads as lighting,
+     which is the whole job of a layer sitting behind the graphic. Keeping it off
+     the scale entirely is what makes that unambiguous, so do not "simplify" this
+     back to a spectrum token. */
+  --neb: #5a6ae0;
+  /* The particle cloud sits under the name. Held below 1 so it stays the
+     background of the header rather than a second focal point competing with
+     the type; the shader's own opacity is tuned against this value. */
+  --cloud-a: 0.92;
+}
+
+:root[data-theme="light"] {
+  --c1: #1f6feb;
+  --c2: #7c4dea;
+  --c3: #0f9d92;
+  --c4: #d97706;
+  --c5: #db2777;
+  --c6: #2f9e44;
+
+  --bg: #f4f5f9;
+  --paper: #eceef4;
+  --card: rgba(255, 255, 255, 0.82);
+  --card-solid: #ffffff;
+  --line: rgba(16, 20, 34, 0.12);
+  --line-strong: rgba(16, 20, 34, 0.26);
+  --ink: #12141c;
+  --ink-soft: #555c6e;
+  --ink-faint: #838b9d;
+  --halo: rgba(244, 245, 249, 0.9);
+  --shadow: 0 18px 44px -22px rgba(20, 26, 50, 0.45);
+  --glass: blur(14px) saturate(150%);
+  --aurora-a: 0.32;
+  /* Saturated color on a pale panel darkens it, and the node labels are read
+     against this, so the light theme takes about half. */
+  --nebula-a: 0.34;
+  /* Same hue held off the discipline scale, pulled darker so it still tints a
+     near-white panel rather than washing out against it. */
+  --neb: #4d5cc9;
+  --cloud-a: 0.9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background 0.4s var(--ease), color 0.4s var(--ease);
+}
+
+.page {
+  position: relative;
+  z-index: 1;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem 3rem;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--c2) 45%, transparent);
+}
+
+/* ==========================================================================
+   Ambient layer: aurora blobs + scroll progress
+   ========================================================================== */
+
+/* Three oversized, heavily blurred radial blobs drifting behind everything.
+   Fixed and pointer-events:none so they never interfere with the page. */
+.aurora {
+  position: fixed;
+  inset: -20vh -10vw;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  filter: blur(90px);
+  opacity: var(--aurora-a);
+}
+
+.aurora span {
+  position: absolute;
+  display: block;
+  width: 46vw;
+  height: 46vw;
+  min-width: 340px;
+  min-height: 340px;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.aurora .b1 {
+  top: -6vh;
+  left: -4vw;
+  background: radial-gradient(circle, var(--c1), transparent 68%);
+  animation: drift1 26s ease-in-out infinite alternate;
+}
+
+.aurora .b2 {
+  top: 18vh;
+  right: -6vw;
+  background: radial-gradient(circle, var(--c5), transparent 68%);
+  animation: drift2 32s ease-in-out infinite alternate;
+}
+
+.aurora .b3 {
+  bottom: -10vh;
+  left: 26vw;
+  background: radial-gradient(circle, var(--c3), transparent 68%);
+  animation: drift3 38s ease-in-out infinite alternate;
+}
+
+@keyframes drift1 {
+  to { transform: translate3d(16vw, 12vh, 0) scale(1.25); }
+}
+@keyframes drift2 {
+  to { transform: translate3d(-18vw, 16vh, 0) scale(1.15); }
+}
+@keyframes drift3 {
+  to { transform: translate3d(12vw, -14vh, 0) scale(1.3); }
+}
+
+/* Reading-position bar across the very top, filled by JS. */
+.progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  z-index: 50;
+  background: linear-gradient(90deg, var(--c1), var(--c2), var(--c5), var(--c4), var(--c6));
+  pointer-events: none;
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 60;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  color: var(--ink);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+
+.theme-toggle:hover {
+  transform: rotate(-20deg) scale(1.08);
+  border-color: var(--c4);
+}
+
+/* ==========================================================================
+   Scroll reveal
+   ========================================================================== */
+/* Gated on .js, which the pre-paint inline script in index.html sets. Only
+   app.js ever adds .in, so hiding these unconditionally meant a visitor with
+   scripting off saw the masthead and nothing else, the résumé included. Visible
+   is the resting state; the reveal is the enhancement. */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+}
+
+.js .reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ==========================================================================
+   Masthead
+   ========================================================================== */
+/* A hero, not a header. The generous vertical padding is what the cloud is for:
+   it needs room above and below the type or it is only ever seen through the
+   gaps between lines. min-height keeps that room even for a short name and
+   tagline, so a fork with two lines of text still gets a hero rather than a
+   band. Both are dropped wherever the cloud is not rendered and the space would
+   be empty, which is two conditions, not one: narrow viewports and reduced
+   motion. The height and the cloud have to be dropped by the same set of
+   queries or one of them collapses without the other. */
+.masthead {
+  position: relative;
+  text-align: center;
+  padding: 3.5rem 0 4.5rem;
+  margin-bottom: 2.5rem;
+  min-height: 34rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Gradient hairline instead of a flat border. */
+.masthead::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--c1), var(--c2), var(--c5), transparent);
+  opacity: 0.7;
+}
+
+/* The WebGL particle cloud: a backdrop spanning the whole header, behind the
+   type, bleeding past the page gutters so it has no visible left or right edge.
+
+   The negative inline inset is deliberate. Ending the cloud at the text column
+   would draw a second, invisible box around the header and make it read as an
+   image placed behind the name; running it off both sides makes it read as the
+   surface the header sits on. `.page` already has overflow-x hidden on the
+   body, so the bleed cannot widen the document.
+
+   Legibility is handled in the shader, not here: `uHole` thins the cloud out
+   over the middle of the frame where the name and tagline sit. A CSS mask
+   cannot do that job, because it would have to cut a lozenge out of the centre
+   of the object, and a hole is more conspicuous than a quieter middle.
+
+   Hidden below 901px and under reduced motion. Both are also checked in JS
+   before the import, so narrow and reduced-motion visitors never download
+   three.js at all; this half only handles the media query flipping after load. */
+.masthead-object {
+  position: absolute;
+  /* The box is bigger than the header on all four sides, and the two axes are
+     oversized for different reasons.
+
+     Horizontally it is sized to overrun the *viewport*, not the header. `.page`
+     is 940px at most, so 24vw of bleed puts the boundary off screen at every
+     width the cloud renders at: 1631px of box in a 1440px window, and still
+     1333 in a 901px one, which is the narrowest this rule survives to. A
+     boundary that is never on screen cannot be a line, which is a stronger
+     guarantee than fading one that is.
+
+     Vertically it cannot do that — the header has a page above and below it —
+     so the box takes 6rem and 5rem of slack and the mask handles the rest.
+
+     Was 14vw and 3rem/1.5rem, which drew a visible rectangle: at 1440 the box
+     was 1343 wide inside a 1440 window, so both vertical boundaries sat on
+     screen with ~97px of bare page beyond them, and the radial mask below was
+     only reaching 43.5% of its own ramp at those edges and so barely fading at
+     all. */
+  top: -6rem;
+  bottom: -5rem;
+  left: -24vw;
+  right: -24vw;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 1.6s var(--ease);
+  /* Vertical only, now that the horizontal boundary is off screen. A radial
+     mask here would fade the left and right of the cloud for no reason — that
+     is exactly the border being removed — and it would cut the corners, which
+     is where the ground forms run widest.
+
+     The two stops are not symmetric because the cloud is not. Every form that
+     has ever worked here sits low, so the bottom fade starts late, at 84%, and
+     the forms' near edges dissolve into it instead of ending at the box. The
+     top stop is insurance: at 1440 the box's top edge is already above the
+     viewport, but a shorter window brings it back on screen. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 84%, transparent 100%);
+}
+
+/* Set by masthead3d.js after its first frame: an unfaded canvas would pop in at
+   full density the moment the module finishes downloading. */
+.masthead-object.in {
+  opacity: var(--cloud-a);
+}
+
+.masthead-object canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Lift the text over the cloud. Written out rather than as `.masthead > *`
+   because that would also hit .avatar-ring and override its `position:
+   absolute`, dropping the avatar back into the flow. */
+.masthead .name,
+.masthead > p,
+.masthead .role,
+.masthead .tagline,
+.masthead .bio,
+.masthead .contact {
+  position: relative;
+  z-index: 1;
+}
+
+/* The avatar sits inside a slowly rotating conic-gradient ring. */
+.avatar-ring {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 122px;
+  height: 122px;
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from 0deg, var(--c1), var(--c2), var(--c5), var(--c4), var(--c6), var(--c1));
+  animation: spin 9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 3px solid var(--bg);
+  animation: spin 9s linear infinite reverse; /* cancel the ring's rotation */
+}
+
+.name {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 6vw, 3.6rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  margin: 0;
+  background: linear-gradient(100deg, var(--c1), var(--c2) 38%, var(--c5) 68%, var(--c4));
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sheen 9s ease-in-out infinite;
+}
+
+@keyframes sheen {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* The job title. It was a pill on its own line and is now the emphasised half of
+   the bio's top row, sharing that line with the degree.
+
+   `display: inline-block` is kept, and not because of the old box: `scrambleRole`
+   in app.js measures this element and pins `min-width` before it starts swapping
+   glyphs, so that a scrambled string of the same length in a proportional font
+   cannot reflow the line. An inline element cannot take a width, so making this
+   `inline` would silently un-pin that and put a twitch back into the first second
+   of the page. Same reason the letter-spacing stays: it is part of the measured
+   width.
+
+   The border is back, and with it the tinted wash. The objection that retired it
+   was that a bordered element beside the bio's hairlines is one frame too many,
+   and that was measured against a masthead whose bio was a scrimmed plate of
+   body copy. Against three short rows it is one label above a block, which is
+   what a border is for. The title also has a job the rest of the masthead does
+   not: it is the single line a recruiter scans for, and a box is how you say
+   "this is the answer to the question you came with".
+
+   Values are the pre-7d48398 ones verbatim rather than retuned by eye, since
+   they were arrived at against this same cloud and this same name. 0.9rem and
+   0.08em happen to be exactly where `.bio-meta` now sits, so the pill and the
+   credential under it share a size and a tracking, which is the whole reason
+   this reads as a label and not as a second design. */
+.role {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0.9rem 0 1rem;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--c1) 22%, transparent),
+    color-mix(in srgb, var(--c2) 22%, transparent),
+    color-mix(in srgb, var(--c5) 22%, transparent)
+  );
+}
+
+/* The line the pill sits on, now unconditional rather than a fallback. Carries
+   no margin of its own: the pill's own 0.9rem/1rem is the spacing, and a margin
+   here would stack with it. Replaces `.role-solo`, which existed only for the
+   no-bio path back when the title otherwise lived inside the bio row. */
+.role-line {
+  margin: 0;
+}
+
+/* NOTE: this whole block is now the *fallback* path. The masthead renders the
+   `.bio` rows below when `profile.bio.lead` is set, and only falls back to this
+   paragraph for a fork that has not filled it in. Kept in full because that fork
+   is a supported state and the reasoning below is what makes it survivable, but
+   read `.bio` first for what actually ships here.
+
+   The bio is the one long run of type sitting directly over the cloud. `uHole`
+   thins the points across the middle of the frame but does not clear them, and
+   thinning is enough for a 3.6rem name and a bold uppercase pill, not for a
+   paragraph at body size. So this is the one block of prose on the page set in
+   full --ink rather than --ink-soft, and a notch above body size: soft grey is a
+   de-emphasis cue that costs contrast, and this text is over a live canvas and
+   can least afford to pay it.
+
+   So it gets the .role pill's hairline and spectrum wash, at roughly half the
+   tint, over a scrim. That is the difference in intent between the two: on the
+   pill the wash is decoration, here it sits on a backdrop that actually has to
+   stop what is behind it. Radius is a rounded rect rather than the pill's 999px,
+   which on three lines of text would bow the ends out into lozenges.
+
+   The scrim is a 25% --bg mix rather than --card (0.72 dark / 0.82 light). --card
+   is the right value for the panels further down, which sit on flat page
+   background and are meant to read as opaque surfaces. Here it erased the cloud
+   outright and left a solid slab in the middle of the header, which reads worse
+   than the problem it fixed.
+
+   And no `backdrop-filter`, which is the other half of the same mistake and the
+   less obvious one. A scrim dims the points; --glass blur(14px) *destroys* them,
+   averaging every point in a 14px radius into one flat wash. Lowering the scrim
+   with the blur still on buys nothing, because there is no longer any dot left
+   underneath to let through: the plate just gets brighter. The pill has no
+   backdrop-filter at all, which is exactly why you can still pick out individual
+   points through it, and matching that is the whole point of this treatment. So
+   every panel elsewhere on the page is --card + --glass and this one is neither.
+   Legibility here comes from the scrim and from full --ink, and stops there. */
+.tagline {
+  color: var(--ink-soft);
+  margin: 0 auto 1.4rem;
+  max-width: 64ch;
+}
+
+/* ...and every word of the reasoning above is conditional on the cloud being
+   there, so the rule is too. It first shipped unconditional, which handed the
+   plate to exactly the visitors with nothing behind it to scrim: `.masthead-object`
+   is `display: none` below 901px and under reduced motion, and app.js removes it
+   outright when the import or the WebGL context fails. A phone got a bordered,
+   washed, scrimmed box around one paragraph, in the tall narrow header where it
+   is one of three things on screen.
+
+   This is the fifth rule in the group the masthead's min-height documents, and
+   it is the same bug that note commemorates: styling that exists to serve the
+   cloud, keyed to something other than the cloud's own condition. The pair here
+   is the pair app.js guards the dynamic import with (`min-width: 901px` and
+   reduced-motion), so the bytes, the canvas and the plate now appear and
+   disappear together.
+
+   Not `.masthead-object.in ~ .tagline`, which would be exact — it fires on the
+   cloud's own first frame and so would cover the WebGL failure too. The plate
+   adds padding and a border, so applying it after first paint shoves the contact
+   row down a beat after load. A visible reflow in the hero costs more than the
+   rare failure case does. */
+@media (min-width: 901px) and (prefers-reduced-motion: no-preference) {
+  .tagline {
+    color: var(--ink);
+    font-size: 1.1rem;
+    width: fit-content;
+    padding: 0.9rem 1.5rem;
+    border-radius: 26px;
+    border: 1px solid var(--line);
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--c1) 12%, transparent),
+        color-mix(in srgb, var(--c2) 12%, transparent),
+        color-mix(in srgb, var(--c5) 12%, transparent)
+      ),
+      color-mix(in srgb, var(--bg) 25%, transparent);
+  }
+}
+
+/* The bio, in three rows. This replaces a paragraph on a scrimmed plate, and
+   the reason is the note above: a plate is what a long run of body-size prose
+   needs to survive over a live canvas, and the fix for that is to stop putting
+   a long run of body-size prose there. Three short rows can be set large and in
+   full --ink, which buys legibility from contrast and size instead of from a
+   backdrop, and lets the cloud show through unbroken.
+
+   So none of the conditional-plate machinery above is repeated here. The rules
+   are unconditional because they cost nothing without the cloud: the hairlines
+   and the type read the same on a flat page, and the text-shadow scrim is
+   --bg over --bg, which is invisible when there is nothing behind it to dim.
+   That is the whole reason this treatment is simpler than the one it replaced. */
+.bio {
+  /* The top margin replaces the pill's. With the pill gone the block sat hard
+     against the name, and the name's descenders very nearly touched the top
+     hairline. */
+  margin: 1.3rem auto 1.4rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 1rem 0 0.9rem;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Every row in this block is full --ink. It is the one run of type sitting
+   directly on the particle cloud, and --ink-soft (#99a3ba dark, #555c6e light)
+   against a moving, unevenly lit background is the worst case for grey: the
+   contrast ratio is not fixed, it changes as the cloud drifts under the words.
+   Hierarchy here comes from weight and size, both of which hold still. */
+.bio-meta,
+.bio-close {
+  color: var(--ink);
+  margin: 0;
+  text-shadow: 0 2px 14px var(--bg);
+}
+
+/* The credential line. It held the job title and the degree as a two row column
+   and now holds the degree alone, since the title left for the pill above.
+
+   The column layout stays anyway, and deliberately. It costs nothing with one
+   child, and the thing it was protecting against is still true: title and degree
+   on one line measured about 1070px against roughly 1000px available, so the row
+   wrapped with the separator dot stranded at the end of the first line. Anything
+   that puts a second item back in here inherits that protection rather than
+   rediscovering it.
+
+   Tracking is 0.08em rather than the 0.12em this row carried while it was the
+   small grey caption under the name. Uppercase needs some tracking to stay
+   readable, but 0.12em at full --ink reads as a different design language from
+   the sentence below it, and the block is meant to read as one thing. It also
+   now matches the pill exactly, which is what ties the two together. */
+.bio-meta {
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Inherits the row's size and tracking now. It carried its own slightly tighter
+   value back when the row was 0.12em and this line was the longest thing in the
+   masthead; at 0.08em there is nothing left to claw back. The explicit 400 is
+   kept even though it is the default: this line is what the pill's 700 is heavy
+   *against*, and that relationship should be stated where it can be read. */
+.bio-degree {
+  font-weight: 400;
+}
+
+.bio-close {
+  font-size: 1rem;
+  margin-top: 0.85rem;
+}
+
+/* The row that has to carry the header. Serif and full --ink, with a heavier
+   scrim than its neighbours because it is the widest run of type over the
+   brightest part of the cloud.
+
+   The block is deliberately a three step scale and not four: 0.82rem caps for
+   the credential, this row, and 1rem for the closing line. It was 0.76 / 1.7 /
+   0.94, which is a 1.8x spread across three adjacent rows, and it read as four
+   unrelated treatments stacked rather than as one block with a hierarchy. Both
+   small rows came up and this one came down; the spread is now about 1.4x.
+   Size is not what distinguishes the title from the degree beside it, weight
+   and --ink against --ink-soft are, so the credential row can afford to be
+   legible rather than merely small. */
+.bio-lead {
+  font-family: var(--serif);
+  font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+  line-height: 1.3;
+  color: var(--ink);
+  /* 0.7rem measured almost the same as the gap below this row but read clearly
+     larger, because the type above is small and the type below is display size,
+     so the optical gap exceeds the metric one. Corrected by eye, which is the
+     only instrument that sees the problem. Still holds at the tightened scale,
+     though by less: the rows are closer in size, so the optical gap is smaller
+     than it was and this margin is nearer to the metric truth than before. */
+  margin: 0.35rem 0 0;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.8rem;
+  white-space: nowrap;
+  text-shadow: 0 2px 18px var(--bg), 0 0 40px var(--bg);
+}
+
+/* The separator, drawn rather than typed. See the template. */
+.bio-lead i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--c2);
+  opacity: 0.85;
+  flex: none;
+}
+
+.contact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+
+/* Contact entries are pills; each link picks up a different spectrum color on
+   hover via the --tint set inline per item. */
+.contact a,
+.contact span.pill {
+  display: inline-block;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color 0.25s var(--ease), border-color 0.25s var(--ease),
+    transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+.contact a:hover {
+  color: var(--tint, var(--c1));
+  border-color: var(--tint, var(--c1));
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px -8px var(--tint, var(--c1));
+}
+
+/* ==========================================================================
+   Stats band
+   ========================================================================== */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 3rem;
+}
+
+.stat {
+  position: relative;
+  padding: 1.1rem 1rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  overflow: hidden;
+  transition: transform 0.35s var(--ease), border-color 0.35s var(--ease);
+}
+
+/* Colored bar along the top edge, plus a faint wash of the same color. */
+.stat::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--tint);
+}
+
+.stat::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 80% at 50% 0%, var(--tint), transparent 70%);
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.stat:hover {
+  transform: translateY(-4px);
+  border-color: var(--tint);
+}
+
+.stat-value {
+  position: relative;
+  font-family: var(--mono);
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--tint);
+  line-height: 1.1;
+}
+
+.stat-label {
+  position: relative;
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+/* ==========================================================================
+   Section headings
+   ========================================================================== */
+.sec-title {
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  margin: 0 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+/* Small colored square marker before each section title. */
+.sec-title::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, var(--tint, var(--c1)), var(--tint2, var(--c2)));
+  box-shadow: 0 0 14px -2px var(--tint, var(--c1));
+}
+
+.sec-title.centered {
+  justify-content: center;
+}
+
+/* ==========================================================================
+   Highlights carousel
+   ========================================================================== */
+.carousel {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-bottom: 3rem;
+}
+
+.car-track {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 6px 4px;
+  scrollbar-width: none;
+}
+
+.car-track::-webkit-scrollbar {
+  display: none;
+}
+
+.car-arrow {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  color: var(--ink-soft);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease), color 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+
+.car-arrow:hover {
+  border-color: var(--c2);
+  color: var(--c2);
+  transform: scale(1.12);
+}
+
+/* Each card carries its own --tint (assigned by index in the template) so the
+   row reads as a spectrum rather than a block of identical boxes. */
+/* --dist is the card's distance from the middle of the track, 0 at the centre
+   and 1 at the edges, written inline by the carousel depth code in app.js on
+   every scroll frame. Cards away from the centre sit back and dim, which turns
+   a flat row into something with depth. It stays 0 without JS, so the row
+   simply renders flat and fully legible.
+
+   --d indirects through it so the :hover rule below can force a card to the
+   front: an inline --dist would otherwise outrank anything the stylesheet says.
+   --lift is the hover offset, kept separate so the two effects compose in one
+   transform instead of overwriting each other. */
+/* One column per highlight: the card's stat tile above the card. The column
+   is the flex item, the snap point, and the element app.js writes --dist on,
+   so the tile and the card share a width, a color and a depth by inheritance
+   rather than by two lists agreeing. */
+.car-col {
+  --dist: 0;
+  flex: 0 0 268px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  scroll-snap-align: center;
+}
+
+.car-col .card {
+  flex: 1 1 auto;
+}
+
+.car-col .stat {
+  --d: var(--dist);
+  opacity: calc(1 - var(--d) * 0.4);
+  transition: opacity 0.18s var(--ease), transform 0.35s var(--ease), border-color 0.35s var(--ease);
+}
+
+.card {
+  --d: var(--dist, 0);
+  --lift: 0px;
+  position: relative;
+  flex: 0 0 268px;
+  scroll-snap-align: center;
+  transform: translateY(calc(var(--lift) + var(--d) * 10px))
+    scale(calc(1 - var(--d) * 0.08));
+  opacity: calc(1 - var(--d) * 0.4);
+  background: var(--card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.2rem 1.25rem;
+  overflow: hidden;
+  /* Short on transform/opacity: these track the scroll position, and a long
+     ease would smear the depth effect behind the finger. */
+  transition: transform 0.18s var(--ease), opacity 0.18s var(--ease),
+    border-color 0.35s var(--ease), box-shadow 0.35s var(--ease);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--tint), transparent);
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(100% 70% at 0% 0%, var(--tint), transparent 65%);
+  opacity: 0.1;
+  pointer-events: none;
+  transition: opacity 0.35s var(--ease);
+}
+
+.card:hover {
+  --lift: -8px;
+  --d: 0; /* hovering pulls a card to the front regardless of where it sits */
+  border-color: var(--tint);
+  box-shadow: 0 20px 40px -24px var(--tint);
+}
+
+.card:hover::after {
+  opacity: 0.2;
+}
+
+.card h2 {
+  position: relative;
+  font-size: 1rem;
+  margin: 0 0 0.45rem;
+  font-weight: 700;
+  color: var(--tint);
+}
+
+.card p {
+  position: relative;
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.card.linked {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Arrow that slides in on hover, signalling the card leaves the site. */
+.card.linked h2::after {
+  content: " \2197";
+  display: inline-block;
+  opacity: 0;
+  transform: translate(-4px, 3px);
+  transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+
+.card.linked:hover h2::after {
+  opacity: 1;
+  transform: none;
+}
+
+/* ==========================================================================
+   Chat
+   ========================================================================== */
+.chat {
+  position: relative;
+  background: var(--card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.6rem;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* Full-spectrum bar across the top of the panel. */
+.chat::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--c1), var(--c2), var(--c5), var(--c4), var(--c6));
+}
+
+.chat-head h2 {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  margin: 0 0 0.5rem;
+}
+
+/* "live" dot next to the chat heading. */
+.live-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background: var(--c6);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--c6) 70%, transparent);
+  animation: pulse 2.2s ease-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes pulse {
+  70% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.chat-note {
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  margin: 0 0 1.3rem;
+  max-width: 64ch;
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.messages:empty {
+  margin-bottom: 0;
+}
+
+.msg {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  max-width: 88%;
+  font-size: 0.94rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  animation: pop 0.45s var(--ease) both;
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+
+.msg.user {
+  align-self: flex-end;
+  color: #fff;
+  background: linear-gradient(120deg, var(--c1), var(--c2));
+  box-shadow: 0 10px 26px -14px var(--c2);
+}
+
+.msg.bot {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--c3) 12%, var(--card-solid));
+  border-left: 3px solid var(--c3);
+  color: var(--ink);
+}
+
+.msg.bot a {
+  color: var(--c3);
+}
+
+.msg.user a {
+  color: #fff;
+}
+
+.msg.error {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--c5) 16%, var(--card-solid));
+  border-left: 3px solid var(--c5);
+  color: var(--ink);
+}
+
+.msg .sources {
+  display: block;
+  margin-top: 0.55rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+}
+
+.msg.thinking {
+  color: var(--ink-soft);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+/* Three staggered dots, one per spectrum color, while the model answers. */
+.dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: block;
+  animation: bounce 1.1s ease-in-out infinite;
+}
+
+.dots i:nth-child(1) { background: var(--c1); }
+.dots i:nth-child(2) { background: var(--c2); animation-delay: 0.15s; }
+.dots i:nth-child(3) { background: var(--c5); animation-delay: 0.3s; }
+
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.55; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+/* Blinking caret shown while the answer is being written, so a pause between
+   tokens reads as "still thinking" rather than "finished". Removed with the
+   .streaming class once the stream closes. */
+.msg.bot.streaming .caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--c2);
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg.bot.streaming .caret {
+    animation: none;
+  }
+}
+
+/* Suggestions */
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.83rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.25s var(--ease), border-color 0.25s var(--ease),
+    background 0.25s var(--ease), transform 0.25s var(--ease);
+}
+
+.chip:hover {
+  color: var(--tint, var(--c1));
+  border-color: var(--tint, var(--c1));
+  background: color-mix(in srgb, var(--tint, var(--c1)) 12%, transparent);
+  transform: translateY(-2px);
+}
+
+/* Composer */
+.composer {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.composer input {
+  flex: 1;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  color: var(--ink);
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+.composer input::placeholder {
+  color: var(--ink-faint);
+}
+
+.composer input:focus {
+  outline: none;
+  border-color: var(--c1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c1) 22%, transparent);
+}
+
+.composer button {
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(120deg, var(--c1), var(--c2));
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), opacity 0.25s var(--ease);
+}
+
+.composer button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -12px var(--c2);
+}
+
+.composer button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ==========================================================================
+   Career arc
+
+   A radial chord diagram generated by tools/build_career_arc.py and inlined
+   into the page by the template. It is inlined rather than loaded through an
+   <img> for one reason: an external SVG document cannot see this stylesheet, so
+   it could not read --c1..--c6 and would not follow the theme toggle.
+
+   The generator emits classes only, never colors. Every fill and stroke below
+   resolves through --tint, which .t1 .. .t6 map onto the six spectrum colors,
+   so a discipline keeps the same color here that it has in the network above.
+   ========================================================================== */
+/* Capped, and centred in the column rather than filling it. The arc is a square
+   scaled to its container, so an uncapped panel in a 940px column drew an 892px
+   figure and a 1113px section: taller than a 900px laptop viewport by itself,
+   before the title and the note. 660px puts it at ~881px, and the type was
+   raised to survive the smaller figure (see .skill-label). The panel reads as a
+   square plate on the page, which is what the figure inside it is.
+
+   This is the stacked state only. Inside the walk the two panels are sized
+   together by --box, which is smaller than this: see .walk-figure below. */
+.career-wrap {
+  position: relative;
+  /* An explicit width, not a max-width, and this is a trap rather than a
+     preference: the figure above is a grid and `margin-inline: auto` makes a
+     grid item shrink-to-fit, so with only a max-width this collapses to the
+     SVG's 300px intrinsic size and the arc renders at less than half size with
+     no rule anywhere saying so. */
+  width: min(660px, 100%);
+  margin-inline: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(110% 80% at 50% 100%, color-mix(in srgb, var(--c3) 12%, transparent), transparent 70%),
+    var(--paper);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* ==========================================================================
+   Walks
+
+   The scrollytelling layout. One section uses it, Skills in Context, and it
+   drives both figures in that section at once: a step isolates one engagement
+   on the career arc and holds that engagement's skills up in the network.
+
+   Everything here is generic anyway. A section opts in with a `.walk` wrapper
+   around a `.walk-figure` and a `.walk-steps` list, and sets the knobs below.
+   `scrollWalk` in app.js asks for `.walk-figure` and `.walk-step` and never for
+   a section name, so a second walk is markup plus one call.
+   ========================================================================== */
+
+/* The knobs.
+
+   --box is the one that matters: the figure is one square arc, so everything
+   else falls out of it. It used to be two boxes side by side, the network and
+   the arc at 460 or 560 each, which put the arc's skill labels at 7.9 to 9.7 CSS
+   px. With the network gone to its own section the arc takes that width: 600
+   here and 680 at the wide tier, which is 10.3 and 11.7 px for a 20 unit label.
+   The live step's labels are drawn a size up again (see .is-walk below).
+
+   --fig is max-content, so the track is exactly as wide as the box in it.
+
+   --walk-w is what the whole thing needs: the box, one 1.75rem gap and a 400px
+   steps column, wide enough that a step's skill list wraps to two lines rather
+   than four. The media queries below are derived from it rather than picked.
+
+   --step-h is the one to reach for if the page feels long: nine steps at 48vh
+   is the bulk of this section's height. */
+.skills-walk {
+  --box: 600px;
+  --fig: max-content;
+  --fig-h: calc(var(--box) + 2px); /* + the panel's 1px border, top and bottom */
+  --walk-w: calc(var(--box) + 1.75rem + 400px);
+  --step-h: 48vh;
+}
+
+/* The resting state, and what a narrow viewport and a reduced-motion visitor
+   both get: the figures stacked, then the steps as a plain list under them.
+   Everything that makes this scrollytelling is added by the one query below, so
+   the fallback is not a set of overrides that could be missed but the state the
+   rules start in.
+
+   The steps are not hidden here, unlike the old skills walk, and the difference
+   is what they say. They used to be the six disciplines, which .skills-fallback
+   inside the panel already listed; they are now the seven engagements, with
+   their dates and detail lines, and nothing else on the page carries those
+   since the chips went. Hiding them would delete the career from every phone. */
+.walk-figure {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.walk-steps {
+  list-style: none;
+  margin: 1.25rem auto 0;
+  padding: 0;
+  max-width: 660px;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.walk-step {
+  padding-left: 0.9rem;
+  border-left: 2px solid color-mix(in srgb, var(--tint) var(--shade, 100%), transparent);
+}
+
+.walk-step h3 {
+  margin: 0.1rem 0 0.25rem;
+  font-size: 1.35rem;
+  line-height: 1.3;
+}
+
+.walk-step .step-when {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--tint) var(--shade, 100%), transparent);
+}
+
+.walk-step .step-detail {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.walk-step .step-skills {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+/* The opening and closing frames are not engagements, so they take no kind
+   color: a neutral rule and label. */
+.walk-step.step-frame {
+  --tint: var(--ink-soft);
+}
+
+/* The closing step returns the whole figure, which only means something where
+   the walk has been isolating it. In the plain list the arc is whole already,
+   so the step is shown by the same query that builds the walk. */
+.walk-step.step-outro {
+  display: none;
+}
+
+/* Which of the two sentences in each figure's note is true. The scroll wording
+   is shown by the same query that builds the walk, so a note cannot claim a
+   behaviour the layout is not providing. */
+.walk-scroll {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   ...and the walk itself.
+
+   Both conditions, not just the width. A reduced-motion visitor on a wide
+   screen would otherwise get several screenfuls of steps that never light up,
+   which is worse than either the figure alone or the plain list: it is a
+   control with nothing behind it. Keyed here rather than in app.js because
+   app.js reads `position` back off .walk-figure to decide whether to drive the
+   filter, so this query is the single place the question is answered.
+
+   1280px, and the 1480 tier below it. These were arithmetic when the walk held
+   two boxes (1276 and 1476 with the gutter); with one box the walk needs only
+   1076px at 600 and 1156 at 680, so both tiers now fit with room to spare. They
+   were kept rather than lowered because height is the binding constraint now:
+   a 680 figure wants a window around 720px tall, which a 1480 wide screen
+   reliably has and a 1280 one does not.
+
+   Below 1280 there is no walk at all: the arc rests whole and the steps are a
+   plain list under it. That is also exactly what a
+   reduced-motion visitor gets at any width, and what a visitor without
+   JavaScript gets. There is no timer tour behind any of those cases any more —
+   see the header on scrollWalk in app.js for why it went with the legends.
+   -------------------------------------------------------------------------- */
+@media (min-width: 1280px) and (prefers-reduced-motion: no-preference) {
+  /* Every rule that builds a walk carries the .js prefix, set before first
+     paint by the inline script in index.html. Only app.js ever adds .is-live,
+     so without it the tall steps and the lead-in are several screenfuls of a
+     list that never lights up. The compact list is the right page for that
+     reader, and it is the one they get. It is also what keeps the gate honest:
+     app.js decides whether to drive the filter by reading `position` off
+     .walk-figure, and app.js not running is exactly the case where that must
+     come back static. */
+  .js .walk {
+    display: grid;
+    grid-template-columns: var(--fig) minmax(0, 1fr);
+    gap: 1.75rem;
+    align-items: start;
+    /* The walk breaks out of the page column, which the single-figure version
+       of this did not have to: 940px held a 660px figure and its steps, and it
+       does not hold two boxes and a steps column. So the width is asked for
+       directly and the negative margins are whatever centring it takes. 100%
+       here is .page's content box (892, since --maxw is a border-box width and
+       its 1.5rem of padding comes out of the 940), so at the 560 tier these are
+       -268px a side.
+
+       Symmetric, and taken out of a container that is itself centred, so the
+       walk stays centred in the viewport and cannot start a horizontal scroll:
+       the min() caps it at the viewport less the 3rem gutter .page never gives
+       up, which is the same gutter the breakpoints above are derived from. */
+    --walk-shown: min(100vw - 3rem, var(--walk-w));
+    width: var(--walk-shown);
+    margin-inline: calc((100% - var(--walk-shown)) / 2);
+  }
+
+  /* The two panels, side by side and square. Fixed at --box rather than
+     flexible for the reason the old --fig was fixed: neither figure's type
+     scales with its box, so a flexible track shrinks the figure the type was
+     tuned against instead of the type with it.
+
+     flex rather than a two-column grid so that one box is one box: a fork with
+     no career arc gets a single 560 panel centred in its own track, not a lone
+     figure stretched across two columns' worth of it. */
+  .js .walk-figure {
+    display: flex;
+    gap: 1.75rem;
+    align-items: start;
+    justify-content: center;
+    /* Centred in the viewport while there is room for it, pinned near the top
+       once there is not. max() with a calc that goes negative on a short window
+       is what replaces a second media query on height. */
+    position: sticky;
+    top: max(1.25rem, calc((100vh - var(--fig-h, 700px)) / 2));
+  }
+
+  .js .walk-figure > * {
+    flex: 0 0 var(--box);
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  /* The lead-in, and it is load bearing rather than spacing. The steps column
+     starts level with the figure, so without it the first step's centre is
+     already above the figure's centre before the section has finished scrolling
+     into view, the walk opens on its first step, and the complete figure — every
+     chord, or the whole network — is never on screen at all. Pushing the first
+     step below the trigger line buys the beat where the figure entire is what
+     you are looking at. Roughly 0.3 of a viewport. */
+  .js .walk-steps {
+    margin: 0;
+    padding-top: 34vh;
+    max-width: none;
+    display: block;
+  }
+
+  /* Just under half a screen each, and this is where a walk's whole cost in
+     page length comes from, so it is the first number to cut if a section
+     starts to feel like a detour. Shorter than about 40vh and two steps are on
+     screen at once, which makes the figure change while you are still reading
+     the step that caused it. */
+  .js .walk-step {
+    min-height: var(--step-h, 48vh);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    opacity: 0.22;
+    border-left-color: var(--line);
+    transition: opacity 0.45s var(--ease), border-left-color 0.45s var(--ease);
+  }
+
+  .js .walk-step.step-outro {
+    display: flex;
+  }
+
+  .js .walk-step.is-live {
+    opacity: 1;
+    border-left-color: color-mix(in srgb, var(--tint) var(--shade, 100%), transparent);
+  }
+
+  /* The one clause of the note that describes the walk, shown by the same query
+     that builds it so the note cannot claim a behaviour the layout is not
+     providing. Same .js prefix as that layout: with scripting off there is no
+     walk to describe. */
+  .js .walk-scroll {
+    display: inline;
+  }
+}
+
+/* The second tier: 680 rather than 600, which takes a 20 unit label from 10.3
+   to 11.7 CSS px. The steps column grows with the viewport either way, since it
+   is the 1fr track. */
+@media (min-width: 1480px) and (prefers-reduced-motion: no-preference) {
+  .js .skills-walk {
+    --box: 680px;
+  }
+}
+
+.career-arc {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Skill ring: one tint per discipline group, matching the network above. */
+.career-arc .t1 { --tint: var(--c1); }
+.career-arc .t2 { --tint: var(--c2); }
+.career-arc .t3 { --tint: var(--c3); }
+.career-arc .t4 { --tint: var(--c4); }
+.career-arc .t5 { --tint: var(--c5); }
+.career-arc .t6 { --tint: var(--c6); }
+
+/* Time sector: one tint per kind, never per engagement. Three hues instead of
+   six rotating ones, so a glance at the upper half reads as education / work /
+   projects. Recency rides on --shade, which the generator writes onto every
+   segment and chord as a color-mix percentage: an early engagement sits back,
+   the current ones come forward at full strength.
+
+   The fade runs toward --paper, not toward --ink-faint. Mixing a saturated hue
+   with grey drags it through mud on the way down (amber lands on brown, which
+   read as a fourth kind rather than as an older one); mixing toward the page
+   holds the hue and just sinks it into the background. It also inverts
+   correctly on its own, going lighter in the light theme and darker in dark. */
+.career-arc .k-edu { --tint: var(--c1); }
+.career-arc .k-work { --tint: var(--c4); }
+.career-arc .k-proj { --tint: var(--c3); }
+
+.career-arc .k-edu,
+.career-arc .k-work,
+.career-arc .k-proj {
+  --hue: color-mix(in srgb, var(--tint) var(--shade, 100%), var(--paper));
+}
+
+/* pointer-events: stroke is what makes a 1px chord hoverable at all; without
+   it the pointer only ever hits the (nonexistent) fill. */
+.career-arc .arc {
+  fill: none;
+  stroke: var(--hue, var(--c1));
+  stroke-width: 2.3;
+  opacity: 0.44;
+  pointer-events: stroke;
+  transition: opacity 0.2s var(--ease), stroke-width 0.2s var(--ease);
+}
+
+/* A walk step leaves one fan, so its chords can afford to be bolder than they
+   are at full density without the middle turning back into a solid mass. */
+.career-arc.is-walk .arc {
+  stroke-width: 3;
+  opacity: 0.8;
+}
+
+/* The live band is drawn heavier than its neighbours. Four 2026 engagements
+   share the last few degrees of the time ring, so without this a lit band is
+   hard to pick out from the dimmed ones beside it. */
+.career-arc.is-walk .seg:not(.is-off):not(.is-past) {
+  stroke-width: 17;
+}
+
+.career-arc .seg.is-past {
+  opacity: 0.35;
+}
+
+/* Filtered out chords and segments leave the figure entirely rather than
+   fading: a ghosted chord still reads as a line crossing the disc, which is
+   the clutter the filter exists to remove. display:none also takes them out of
+   hit testing, so :hover isolation keeps working on what is left. */
+.career-arc .arc.is-off,
+.career-arc .seg.is-off {
+  display: none;
+}
+
+/* A skill whose every engagement is switched off keeps its place on the ring,
+   since the ring's layout is baked into the SVG, but stops competing for
+   attention with the ones still joined to something. */
+.career-arc .dot,
+.career-arc .skill-label {
+  transition: opacity 0.25s var(--ease);
+}
+
+/* What a walk step does to the ring. Not yet reached: a dot with no label,
+   which is what takes the figure from 46 labels at once to one step's worth.
+   Walked past: a faint label, so the career builds up as the reader scrolls.
+   Live: full strength and a size up, since these are the labels the step is
+   about. The size step is safe because a live skill's neighbours on the ring
+   are mostly unlabelled; 23 rather than more because "Model Experimentation"
+   has 200 units of radial room (see R_SKILL_LABEL). */
+.career-arc.is-walk .dot.is-dim {
+  opacity: 0.18;
+}
+
+.career-arc.is-walk .skill-label.is-dim {
+  opacity: 0;
+}
+
+.career-arc.is-walk .dot.is-past {
+  opacity: 0.55;
+}
+
+.career-arc.is-walk .skill-label.is-past {
+  opacity: 0.32;
+}
+
+.career-arc.is-walk .skill-label.is-cur {
+  font-size: 23px;
+  font-weight: 600;
+  fill: color-mix(in srgb, var(--tint) 60%, var(--ink));
+}
+
+/* Engagement names, one per band, shown only for the live step. The px values
+   are mirrored in tools/build_career_arc.py, which sizes its clamp from them. */
+.career-arc .seg-label {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s var(--ease);
+}
+
+.career-arc .seg-label.is-cur {
+  opacity: 1;
+}
+
+.career-arc .sl-name {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 30px;
+  fill: var(--ink);
+}
+
+.career-arc .sl-yrs {
+  font-family: var(--mono);
+  font-size: 22px;
+  fill: var(--hue);
+}
+
+/* The opening step's callouts. Pills with a solid fill, because they sit on
+   top of the chords and bare type over a fan of lines did not read. */
+.career-arc .guide {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s var(--ease);
+}
+
+.career-arc.is-intro .guide {
+  opacity: 1;
+}
+
+.career-arc .g-pill rect {
+  fill: color-mix(in srgb, var(--paper) 88%, var(--ink));
+  stroke: color-mix(in srgb, var(--ink) 35%, transparent);
+  stroke-width: 1.5;
+}
+
+.career-arc .g-pill text {
+  font-family: var(--sans);
+  font-size: 28px;
+  font-weight: 500;
+  fill: var(--ink);
+}
+
+/* Hovering anywhere in the figure drops every chord back so the one under the
+   pointer can come forward. The two rules together are the whole interaction:
+   no JavaScript, and the native <title> tooltip names both endpoints. */
+.career-arc:hover .arc {
+  opacity: 0.1;
+}
+
+.career-arc .arc:hover {
+  opacity: 1;
+  stroke-width: 4;
+}
+
+.career-arc .seg {
+  fill: none;
+  stroke: var(--hue, var(--c1));
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+
+.career-arc .key-swatch {
+  stroke: var(--tint, var(--c1));
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.career-arc .dot {
+  fill: var(--tint, var(--c1));
+}
+
+/* These are the labels the whole figure is read through, so they get the room:
+   the generator pulls R_RING in specifically to fund this size. 16px is about
+   the ceiling, since the longest label leaves at 0 degrees, dead horizontal,
+   where SIZE/2 - R_SKILL_LABEL is all the clearance it has before the viewBox
+   edge. Growing it further means moving the ring in again, not just editing
+   this number. Mixed to 75% of the discipline tint rather than 55%: at this
+   size the label is doing the reading, not just tagging a dot. */
+/* 20px, not the 16px this shipped with, and the two halves of that change are
+   inseparable: the figure is square and sized to its column, so its width sets
+   both the section's height and how large this renders. Legible at 11px needed
+   a rendered width of at least 797px; fitting a 900px viewport needed at most
+   672px. There was no width that satisfied both, which is why scaling the
+   figure never helped either surface. Raising the type relative to the figure is
+   the only lever, and the angular room for it came from widening the generator's
+   skill sector from 200 to 220 degrees, not from dropping labels: all 47 still
+   draw. Change one of the three (this, SKILL_A1, the max-width on .career-wrap)
+   and the other two have to be rechecked. */
+.career-arc .skill-label {
+  font-family: var(--sans);
+  font-size: 20px;
+  letter-spacing: 0.01em;
+  fill: color-mix(in srgb, var(--tint, var(--ink-soft)) 75%, var(--ink-soft));
+}
+
+.career-arc .rule-arc {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.career-arc .rule line {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+/* Scaled with .skill-label for the same reason. At the old 15px these rendered
+   at 8.5 CSS px once the figure was capped, which is below the year ticks being
+   worth drawing at all. */
+.career-arc .rule text {
+  font-family: var(--mono);
+  font-size: 24px;
+  fill: var(--ink-faint);
+}
+
+.career-arc .hub-k {
+  font-family: var(--sans);
+  font-size: 20px;
+  fill: var(--ink-faint);
+}
+
+/* Draw in, staggered by the --i the generator writes onto each chord. 1200 is
+   comfortably longer than the longest possible chord, so one dash covers any
+   path and no length has to be measured in JavaScript. Keyed off .reveal.in,
+   which the scroll observer already sets, so the figure draws itself when it
+   scrolls into view instead of before anyone can see it. */
+.reveal.in .career-arc .arc {
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: arc-draw 1.1s var(--ease) forwards;
+  animation-delay: calc(var(--i, 0) * 16ms);
+}
+
+@keyframes arc-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ==========================================================================
+   Results chart
+
+   Generated by tools/build_results_chart.py and inlined, for the same reason
+   the career arc is: an external SVG document cannot read these variables.
+
+   Two hues only, and neither one encodes identity. Every mark is labeled on the
+   chart, so --c3 is just "a measurement" and --c4 is "the one that was chosen".
+   That pair was picked by running it through a CVD check against both surfaces
+   rather than by eye: teal against pink, the first try, separated by only 4.6
+   ΔE under deuteranopia and would have collapsed into one color for a red green
+   colorblind reader. Teal against amber clears 13.6. Do not swap either for a
+   neighbouring spectrum token without rechecking that.
+   ========================================================================== */
+.results {
+  margin-top: 3.5rem;
+}
+
+.results-note {
+  text-align: center;
+  font-size: 0.86rem;
+  color: var(--ink-faint);
+  margin: -0.4rem auto 1rem;
+  max-width: 62ch;
+}
+
+.results-wrap {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(90% 70% at 20% 0%, color-mix(in srgb, var(--c3) 10%, transparent), transparent 70%),
+    var(--paper);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  padding: 0.6rem 0.4rem 0.2rem;
+}
+
+.results-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  --mark: var(--c3);
+}
+
+.results-chart .is-hi {
+  --mark: var(--c4);
+}
+
+/* Recessive: the grid is a reading aid, not data. */
+.results-chart .grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.results-chart .axis line {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.results-chart .tick {
+  font-family: var(--mono);
+  font-size: 14px;
+  fill: var(--ink-faint);
+}
+
+.results-chart .axis-title {
+  font-family: var(--sans);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  fill: var(--ink-faint);
+}
+
+/* The "what counts as good" line. Dashed so it never reads as a data series. */
+.results-chart .marker line {
+  stroke: var(--ink-faint);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+}
+
+.results-chart .marker text {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-style: italic;
+  fill: var(--ink-faint);
+}
+
+.results-chart .frontier {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 2;
+  stroke-dasharray: 3 6;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+/* The 2px surface ring keeps two dots legible where they overlap. */
+.results-chart .dot circle {
+  fill: var(--mark);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+
+.results-chart .dot-label {
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.results-chart .dot-value,
+.results-chart .bar-value {
+  font-family: var(--mono);
+  font-size: 14px;
+  fill: var(--ink-faint);
+}
+
+.results-chart .bar rect {
+  fill: var(--mark);
+}
+
+.results-chart .bar-label {
+  font-family: var(--sans);
+  font-size: 16px;
+  fill: var(--ink-soft);
+}
+
+/* Values and labels wear ink, never the mark color, so the colored mark beside
+   them is the only thing carrying emphasis. */
+.results-chart .is-hi .dot-label,
+.results-chart .is-hi .bar-label {
+  fill: var(--ink);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Eval panel. Built by tools/build_eval_panel.py, inlined so it follows the
+   theme toggle. The generator emits classes only; every color is decided here.
+
+   Two hues, and they mean direction of change, never which metric. The metrics
+   are told apart by which column they sit in, so the figure survives grayscale,
+   printing, and forced-colors with nothing lost.
+
+   The steps below are not the site's --c1..--c6 and that is the point. Those
+   were run through the palette validator for this figure and the scale cannot
+   do this job: --c1 against --c2 is 1.5 dE under protanopia and 11.9 under
+   normal vision, far under the 15 floor, so four site hues cannot carry four
+   series. Green against red, the reflex for polarity, is worse still at 2.7 dE
+   under deuteranopia. Blue against amber clears every check on both surfaces,
+   and each theme takes its own step because the passing band differs by
+   surface: light wants OKLCH L 0.43 to 0.77 and dark wants 0.48 to 0.67, so a
+   dark mark is *darker* than its light counterpart rather than brighter.
+   --------------------------------------------------------------------------- */
+.eval-panel {
+  display: block;
+  width: 100%;
+  height: auto;
+  --up: #4d8dff;
+  --down: #cf7c1a;
+}
+
+:root[data-theme="light"] .eval-panel {
+  --up: #2f6fd0;
+  --down: #c2631a;
+}
+
+.eval-panel .fig-foot {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  fill: var(--ink-faint);
+}
+
+.eval-panel .row-rule {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.eval-panel .idx {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  fill: var(--ink-faint);
+}
+
+/* The claim is the one thing on a row meant to be read first, so it is the
+   only serif and the only full ink text in the figure besides the after values. */
+.eval-panel .claim {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.eval-panel .row-detail {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  fill: var(--ink-faint);
+}
+
+.eval-panel .track-label {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  fill: var(--ink-soft);
+}
+
+.eval-panel .track-label .n,
+.eval-panel .arrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  fill: var(--ink-faint);
+}
+
+/* Recessive: the track is the scale the two dots sit on, not data. */
+.eval-panel .track {
+  stroke: var(--line);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.eval-panel .move {
+  stroke: var(--mark);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* Before is an outline and after is solid, so which end is which reads without
+   color at all. The 2px surface ring keeps the two readable where a small
+   change puts them close enough to touch. */
+.eval-panel .dot-before {
+  fill: var(--paper);
+  stroke: var(--ink-faint);
+  stroke-width: 2;
+}
+
+.eval-panel .dot-after {
+  fill: var(--mark);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+
+.eval-panel .cell {
+  --mark: var(--ink-faint);
+}
+
+.eval-panel .cell.is-up {
+  --mark: var(--up);
+}
+
+.eval-panel .cell.is-down {
+  --mark: var(--down);
+}
+
+/* Values wear text tokens, never the mark color: the dot beside a number is
+   what carries direction, and a colored numeral would say it twice while
+   costing contrast. The after value is the one being read, so it is the
+   emphasised one. */
+.eval-panel .val {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  fill: var(--ink-faint);
+}
+
+.eval-panel .val-after {
+  fill: var(--ink);
+  font-weight: 600;
+}
+
+/* 4.5rem rather than the 3.5rem the other sections use, because of what is above
+   it: `.chat` is a bordered, shadowed card, and at 3.5rem this section looked
+   like the panel's own footer rather than the next thing on the page.
+
+   It is a card itself now, on the chat's own surface tokens, so it reads as a
+   section of its own and as the same family of container as the thing it
+   measures. The margin still buys separation between the two borders. */
+.evals {
+  margin-top: 4.5rem;
+}
+
+.evals.eval-card {
+  background: var(--card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.8rem 2rem 1.2rem;
+}
+
+.eval-card .sec-title {
+  margin-top: 0;
+}
+
+/* One sentence, and unbalanced it left a single word on its second line. */
+.eval-card .results-note {
+  margin-bottom: 1.4rem;
+  text-wrap: balance;
+}
+
+/* Under 760px the SVG's type would fall below 10 CSS px, the same threshold
+   that retires the results chart. The table below it is the figure there. */
+@media (max-width: 760px) {
+  .eval-wrap {
+    display: none;
+  }
+}
+
+/* The table is the figure at 390px, so nothing in it may be cut off. It scrolls
+   inside its own box rather than letting the page scroll sideways, which would
+   move the whole layout and is the usual way a "responsive" table breaks. */
+.eval-table .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.eval-table .table-scroll table {
+  min-width: 38rem;
+}
+
+/* At 390px the card's own border and padding leave about 20rem, under the old
+   21rem floor, and the After column was cut off at the edge of the first
+   screenful. Four columns with n folded under each measure fit with no floor at
+   all, so the floor goes and the card's side padding tightens. */
+@media (max-width: 760px) {
+  .evals.eval-card {
+    padding: 1.3rem 0.75rem 1rem;
+  }
+  .eval-table .table-scroll table {
+    min-width: 0;
+  }
+  .eval-table tbody th[scope="rowgroup"] {
+    width: 8.5rem;
+  }
+  /* Measured at 390px: the table came out 3px wider than its box, and the 3px
+     was the last column's right padding. The card's own padding already clears
+     the numbers from the border, so the cell's is redundant there. */
+  .eval-table th:last-child,
+  .eval-table td:last-child {
+    padding-right: 0;
+  }
+}
+
+/* The row header is a full sentence, and uppercasing it at this width turned it
+   into six stacked lines that set the height of every row beside it.
+
+   The width is capped as well as un-uppercased. Left to size itself the header
+   took about 90% of the scroll width and left the four numeric columns fighting
+   over what was left, which is backwards: the numbers are what the table is
+   for, and the label only has to be identifiable. */
+.eval-table tbody th[scope="rowgroup"] {
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: top;
+  line-height: 1.35;
+  width: 13rem;
+}
+
+/* The table is the accessible equal of the figure, not a debug view: the light
+   theme's mark colors sit just under 3:1 against the page, which is allowed only
+   where the numbers are also readable as text. It is also the no JS and print
+   path, and it is where the exact values live. */
+.results-table {
+  margin: 0.9rem auto 0;
+  max-width: 72ch;
+  font-size: 0.86rem;
+}
+
+.results-table summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 0.35rem 0;
+  list-style: none;
+}
+
+.results-table summary::-webkit-details-marker {
+  display: none;
+}
+
+.results-table summary::before {
+  content: "▸ ";
+  color: var(--c3);
+}
+
+.results-table[open] summary::before {
+  content: "▾ ";
+}
+
+.results-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+
+.results-table th,
+.results-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.results-table th {
+  color: var(--ink-faint);
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.results-table td.n {
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+.results-table .src {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+
+/* ==========================================================================
+   Skillset neural network
+   ========================================================================== */
+.skills {
+  margin-top: 3.5rem;
+}
+
+.skills-note {
+  text-align: center;
+  font-size: 0.86rem;
+  color: var(--ink-faint);
+  margin: -0.4rem 0 1rem;
+}
+
+/* Dark inset panel: the network reads as an instrument, not a page element,
+   and the glow has something to sit against in both themes. */
+.skill-net-wrap {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* The discipline filter. One chip on at a time, or All. Released chips fade
+   right down so which one is showing reads at a glance. */
+.skill-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+}
+
+.skill-legend li {
+  display: flex;
+}
+
+.legend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--tint, var(--ink-soft)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint, var(--ink-soft)) 45%, transparent);
+  transition: color 0.25s var(--ease), background 0.25s var(--ease),
+    border-color 0.25s var(--ease), opacity 0.25s var(--ease), transform 0.2s var(--ease);
+}
+
+.legend-btn:hover {
+  color: var(--tint, var(--ink));
+  transform: translateY(-1px);
+}
+
+.legend-btn[aria-pressed="true"] {
+  color: color-mix(in srgb, var(--tint, var(--ink)) 85%, var(--ink));
+}
+
+.legend-btn[aria-pressed="false"] {
+  opacity: 0.4;
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink-faint);
+}
+
+.legend-btn.all {
+  --tint: var(--ink-soft);
+  font-weight: 600;
+}
+
+.legend-btn .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--tint);
+  box-shadow: 0 0 10px -1px var(--tint);
+}
+
+.legend-btn[aria-pressed="false"] .swatch {
+  background: var(--ink-faint);
+  box-shadow: none;
+}
+
+/* Nebula behind the network.
+ *
+ * This replaces a static `radial-gradient(120% 90% at 50% 0%, c2 14%, …)` that
+ * used to be a second background layer on the wrap above. Two things about that
+ * arrangement are worth writing down, because they are why an earlier attempt at
+ * a drifting version of this was invisible on the page:
+ *
+ *  1. The wrap's background painted over it. A background layer belongs to the
+ *     wrap, so anything hoping to sit "behind the canvas" had to sit above that
+ *     layer, in the element tree, not behind the wrap. `var(--paper)` is fully
+ *     opaque, and z-index cannot climb over an ancestor's own background.
+ *  2. `overflow: hidden` clips the blur. A blurred box paints well outside its
+ *     own bounds, and that overspill is exactly the soft part. Clipped at the
+ *     wrap's padding box, a blob inset inside the panel loses its falloff and
+ *     what survives is a faint even wash, which against --paper plus the old 14%
+ *     gradient was below the threshold of being noticed at all.
+ *
+ * So: `inset: -28%` puts the blobs' hard cores outside the visible box and lets
+ * the clip take only dead space, and the wrap's own gradient is gone so this is
+ * the only thing tinting the panel rather than the second-faintest of two. The
+ * canvas is transparent (the network only ever calls clearRect), so it composites
+ * straight over this.
+ *
+ * All three blobs carry one hue (`--neb`, see :root). They are still three
+ * elements on three drift timings because that is what gives the layer internal
+ * movement and uneven density, i.e. what makes it a cloud rather than a
+ * gradient. What they are no longer is three *colors*: that made this read as
+ * the page's own multi-hue aurora repeated inside a panel, and it put discipline
+ * color behind discipline-colored nodes. Structure from the blobs, meaning from
+ * nothing. */
+.net-nebula {
+  position: absolute;
+  inset: -28%;
+  z-index: 0;
+  pointer-events: none;
+  /* Enough blur that the three blobs are clouds rather than discs, but not so
+     much that they average into one flat wash. Past roughly 80px they stop
+     being distinguishable from a single background gradient, which is what this
+     replaced. */
+  filter: blur(52px);
+  opacity: var(--nebula-a);
+}
+
+/* One blob per discipline, all created by skillNet, which also writes
+   transform and opacity on every frame from that cluster's centroid. There is
+   no CSS keyframe here and there should not be: a drift animation would fight
+   the transform JS is writing, so the idle wander is folded into that same
+   transform. Position is left at the origin and carried entirely by the
+   transform, which keeps this off the layout path.
+
+   `is-bound` exists only so this cannot apply to an unfilled `.net-nebula`.
+   There is no static fallback to fall back to: the nebula is hidden until
+   `.skills.animated`, and that class is added by skillNet itself immediately
+   before it binds, so an unbound nebula is never on screen. */
+.net-nebula.is-bound span {
+  position: absolute;
+  display: block;
+  top: 0;
+  left: 0;
+  width: 34%;
+  height: 40%;
+  border-radius: 50%;
+  opacity: 0;
+  will-change: transform, opacity;
+  background: radial-gradient(circle, var(--neb), transparent 66%);
+}
+
+/* Constellation cloud, between the nebula and the network.
+ *
+ * The layering in this panel is three deep and the order is the whole point:
+ * the nebula is the atmosphere, this is the structure in it, and the network
+ * canvas is the figure on top. Dropping the nebula when this arrived was
+ * tempting and would have been wrong: the nebula is what makes the panel a
+ * different surface from the page, which is the complaint that started this,
+ * and points alone over flat --paper is a neural net in a void rather than in a
+ * cloud. What changed instead is that the nebula came off the discipline scale,
+ * so the two soft layers are now one hue between them and cannot muddy.
+ *
+ * Unlike the masthead this is inset to the panel rather than bled past it. The
+ * wrap clips (see the nebula note above), so a bleed would only be thrown away,
+ * and the panel has a visible border that the cloud should sit inside rather
+ * than run under. */
+.net-cloud {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.6s var(--ease);
+  /* Same job as the masthead's mask: keep the canvas boundary from ever being a
+     visible edge. Rounder here, because the box is nearer square. */
+  -webkit-mask-image: radial-gradient(100% 100% at 50% 50%, #000 45%, transparent 94%);
+  mask-image: radial-gradient(100% 100% at 50% 50%, #000 45%, transparent 94%);
+}
+
+.net-cloud.in {
+  opacity: 1;
+}
+
+.net-cloud canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Without the network drawn over it the nebula is just a stain behind a chip
+   list, so it only shows where it has something to be behind. The cloud goes
+   with it, for the same reason and more so: it is a 3D echo of a figure that is
+   not being drawn. */
+.skills:not(.animated) .net-nebula,
+.skills:not(.animated) .net-cloud {
+  display: none;
+}
+
+/* Same pair of conditions as the masthead cloud, and checked in JS before the
+   import for the same reason. A phone gets the network and the nebula; what it
+   does not get is 750 KB of three.js for a layer behind them. */
+@media (max-width: 900px) {
+  .net-cloud {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .net-cloud {
+    display: none;
+  }
+}
+
+#skill-net {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 600px;
+  cursor: crosshair;
+}
+
+/* Accessible / no-JS / reduced-motion fallback: a plain chip list of skills,
+   tinted by group. Hidden while the animated canvas is active. */
+.skills-fallback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 1.4rem;
+}
+
+.skills-fallback li {
+  border: 1px solid color-mix(in srgb, var(--tint, var(--c1)) 45%, transparent);
+  color: color-mix(in srgb, var(--tint, var(--c1)) 80%, var(--ink));
+  background: color-mix(in srgb, var(--tint, var(--c1)) 10%, transparent);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* Once JS starts the animation, the canvas replaces the chip list. The list
+   stays in the DOM (visually hidden) so assistive tech still reads the skills. */
+.skills.animated .skills-fallback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Without the .animated class (no JS, or reduced motion) show chips, hide the
+   canvas and the legend the canvas explains. */
+.skills:not(.animated) #skill-net,
+.skills:not(.animated) .net-live {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .aurora span,
+  .net-nebula span,
+  .avatar-ring,
+  .avatar,
+  .name,
+  .live-dot,
+  .dots i {
+    animation: none !important;
+  }
+  /* The cloud is motion end to end, and its whole point is the morph: there is
+     no static frame of it worth 750 KB, so it is not rendered at all. app.js
+     checks the same query before the import, so the bytes are never requested
+     either. */
+  .masthead-object {
+    display: none;
+  }
+  /* Same reasoning as the narrow-viewport collapse: the hero's height is room
+     for the cloud, and with no cloud it is an empty screenful before the
+     content starts. */
+  .masthead {
+    min-height: 0;
+    padding: 3.5rem 0 4rem;
+    display: block;
+  }
+  /* Carries the .js prefix so it still outranks `.js .reveal` above. Written as
+     `.reveal` alone this silently stopped applying the moment that rule gained
+     a class, and reduced-motion visitors would have got the fade back. */
+  .reveal,
+  .js .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  /* Reduced motion cancels the draw in and shows the figure already finished.
+     The legend filter still works, it just cuts between states rather than
+     fading, since the filter is a control and not decoration. */
+  .reveal.in .career-arc .arc {
+    animation: none;
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+  .career-arc .arc,
+  .career-arc .dot,
+  .career-arc .skill-label {
+    transition: none;
+  }
+  .skills.animated #skill-net,
+  .skills.animated .net-live {
+    display: none;
+  }
+  .skills.animated .skills-fallback {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 1.4rem;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}
+
+/* ==========================================================================
+   Résumé
+   ========================================================================== */
+.resume {
+  margin-top: 3rem;
+}
+
+.resume details {
+  position: relative;
+  background: var(--card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.resume details::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--c4), var(--c5), var(--c2));
+}
+
+.resume-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.15rem 1.4rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.resume-head::-webkit-details-marker {
+  display: none;
+}
+
+.resume-title {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.resume-toggle {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--ink-faint);
+}
+
+.resume-toggle::before {
+  content: "\25b8  ";
+  color: var(--c4);
+}
+
+details[open] .resume-toggle {
+  visibility: hidden;
+}
+
+.resume-print {
+  border: 1px solid transparent;
+  background: linear-gradient(120deg, var(--c4), var(--c5));
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+.resume-print:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px -12px var(--c5);
+}
+
+.resume-body {
+  padding: 0.5rem 1.4rem 1.4rem;
+  border-top: 1px solid var(--line);
+}
+
+.resume-body h2 {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  margin: 1.6rem 0 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, var(--c1), var(--c2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  width: fit-content;
+}
+
+/* Each role/project heading becomes a timeline entry: a colored node on a
+   vertical rule running down the left of the block. */
+.resume-body h3 {
+  position: relative;
+  font-size: 1rem;
+  margin: 1.3rem 0 0.3rem;
+  padding-left: 1.3rem;
+  color: var(--ink);
+}
+
+.resume-body h3::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c3);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c3) 22%, transparent);
+}
+
+.resume-body h3 + p,
+.resume-body h3 + p + ul,
+.resume-body h3 + ul {
+  padding-left: 1.3rem;
+  border-left: 1px solid var(--line);
+  margin-left: 4px;
+}
+
+.resume-body p,
+.resume-body li {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.resume-body ul {
+  margin: 0.35rem 0;
+  padding-left: 2.4rem;
+}
+
+.resume-body li::marker {
+  color: var(--c3);
+}
+
+.resume-body strong {
+  color: var(--ink);
+}
+
+/* ==========================================================================
+   Contact
+   A card like the chat, with the composer's field and button treatment so the
+   two forms on the page read as one family. Hidden without scripting: the CSP's
+   `form-action 'none'` blocks a native submit silently (see index.html).
+   ========================================================================== */
+.contact-card {
+  position: relative;
+  margin-top: 3rem;
+  background: var(--card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.6rem;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+html:not(.js) .contact-card {
+  display: none;
+}
+
+.contact-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--c4), var(--c5), var(--c2));
+}
+
+.contact-card h2 {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  margin: 0 0 0.5rem;
+}
+
+.contact-note {
+  color: var(--ink-soft);
+  margin: 0 0 1.2rem;
+}
+
+.contact-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.contact-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+}
+
+.contact-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.contact-form input,
+.contact-form textarea {
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  font-weight: 400;
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  color: var(--ink);
+  resize: vertical;
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: none;
+  border-color: var(--c1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c1) 22%, transparent);
+}
+
+/* Off screen rather than display:none, which some bots check for. */
+.contact-trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.contact-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.contact-status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.contact-status.is-error {
+  color: var(--c5);  /* the chat's error hue, see .msg.error */
+}
+
+.contact-foot button {
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(120deg, var(--c1), var(--c2));
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), opacity 0.25s var(--ease);
+}
+
+.contact-foot button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -12px var(--c2);
+}
+
+.contact-foot button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 600px) {
+  .contact-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-foot button:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+.foot {
+  position: relative;
+  margin-top: 3rem;
+  padding-top: 1.6rem;
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.foot::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--c3), var(--c6), transparent);
+  opacity: 0.6;
+}
+
+/* ==========================================================================
+   Print: emit a clean, résumé-only PDF on white. Everything decorative is
+   dropped and the gradient text is forced back to solid ink.
+   ========================================================================== */
+@media print {
+  /* All three selectors, and that is the whole point of this rule.
+     A bare `:root` here is specificity (0,0,1) and loses to
+     `:root[data-theme="dark"]` at (0,1,1), which is where the themed values are
+     actually set. So printing from the dark theme kept --ink at #eef1f8 and
+     every element coloured with it came out near-white on white paper. It was
+     invisible in review because h2 and the body text are given a literal #000
+     further down, so only the h3 role and project headings vanished, and a
+     missing heading reads as a layout choice rather than as a bug.
+
+     Matching the theme selectors is the fix rather than hardcoding a colour on
+     each element: the next element to use var(--ink) would otherwise inherit
+     the same trap silently. */
+  :root,
+  :root[data-theme="dark"],
+  :root[data-theme="light"] {
+    --ink: #000;
+    --ink-soft: #222;
+    --ink-faint: #444;
+    --line: #bbb;
+    --line-strong: #888;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .page {
+    padding: 0;
+    max-width: none;
+  }
+  /* Every section except .resume, plus the chrome. This list is the whole
+     correctness condition for the PDF and it has now drifted twice: the old
+     .career section and .results were added to the page long after this block
+     was written, so the "résumé-only" PDF silently grew a career arc and a
+     results chart, and then .evals did the same and printed the eval panel above
+     the résumé. If a <section> is added to index.html it belongs here unless it
+     is the résumé, and tests/test_print_css.py now fails when one does not.
+     (.career itself is gone: the arc lives inside .skills since the two figures
+     merged into one walk, so one entry hides both.)
+
+     Stated as an explicit list rather than `.page > section { display: none }`
+     plus an override, because the figures carry generated SVG and a rule that
+     hides by position would keep working while quietly meaning something else
+     the first time the markup is reordered. */
+  .aurora,
+  .progress,
+  .theme-toggle,
+  .masthead,
+  .stats,
+  .carousel,
+  .chat,
+  .evals,
+  .skills, /* both the arc's section and the network's */
+  .results,
+  .contact-card,
+  .foot,
+  .resume-toggle,
+  .resume-print {
+    display: none !important;
+  }
+  /* The résumé is below the fold, so its .in class is only added once it has
+     been scrolled to. Printing from the browser's own menu rather than the
+     Download PDF button therefore emitted pages that were laid out but empty,
+     since opacity 0 still takes up space. Never depend on a scroll-driven class
+     being present at print time. */
+  .reveal,
+  .js .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* Print the résumé whether or not the panel was ever opened. The Download PDF
+     button opens it first; the browser's own print menu does not, and Cmd+P on
+     a closed panel emitted a single page containing the word "Resume".
+
+     Both rules are load bearing, and the second one alone was measured not to
+     work. Chrome hides a closed <details> through the ::details-content pseudo
+     element, so a rule aimed at the body inside it never applies; browsers
+     without that pseudo hide the children directly, where the display override
+     is what lands. Neither selector covers both, so keep the pair. */
+  #resume-details::details-content {
+    content-visibility: visible !important;
+    opacity: 1 !important;
+    block-size: auto !important;
+  }
+  #resume-details > .resume-body {
+    display: block !important;
+    content-visibility: visible !important;
+  }
+  .resume {
+    margin: 0;
+  }
+  .resume details,
+  .resume-body {
+    border: none;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .resume details::before {
+    display: none;
+  }
+  .resume-head {
+    padding: 0 0 0.5rem;
+  }
+  .resume-body h2 {
+    color: #000;
+    background: none;
+    -webkit-text-fill-color: #000;
+  }
+  .resume-body h3 + p,
+  .resume-body h3 + p + ul,
+  .resume-body h3 + ul {
+    border-left: none;
+  }
+  .resume-body p,
+  .resume-body li {
+    color: #000;
+  }
+
+  /* Print typography, which this block used to leave to the screen rules.
+     Everything above only hides chrome and strips decoration, so the résumé
+     printed at on-screen reading sizes: 0.9rem body on a 1.6 line-height with
+     1.3 to 1.6rem gaps above every heading. That is correct for a monitor and
+     is roughly a third larger than any résumé is set, which is why ~1,000 words
+     was landing on three pages while the same content sits on two in Word.
+
+     Sized in pt rather than rem on purpose: this block only ever applies to
+     paper, where a physical unit is the one that means something, and it stops
+     a future change to the root font size from silently re-paginating the one
+     artifact a recruiter saves. */
+  .resume-body {
+    font-size: 10.5pt;
+    line-height: 1.34;
+    padding: 0;
+  }
+  .resume-body h2 {
+    font-size: 12pt;
+    margin: 0.85em 0 0.3em;
+    padding-bottom: 0.15em;
+  }
+  .resume-body h3 {
+    font-size: 10.5pt;
+    margin: 0.65em 0 0.15em;
+  }
+  .resume-body p,
+  .resume-body li {
+    font-size: 9.6pt;
+    margin: 0.15em 0;
+  }
+  .resume-body ul {
+    margin: 0.2em 0;
+    padding-left: 1.25rem;
+  }
+
+  /* A role split across a page break reads as two half-jobs, and a heading
+     stranded at the foot of a page is worse than the break it was avoiding. */
+  .resume-body h2,
+  .resume-body h3 {
+    break-after: avoid;
+    break-inside: avoid;
+  }
+  .resume-body li {
+    break-inside: avoid;
+  }
+  .resume-body p,
+  .resume-body li {
+    orphans: 2;
+    widows: 2;
+  }
+
+  @page {
+    margin: 0.5in;
+  }
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+/* Hover is the primary interaction on both figures and a touchscreen has none:
+   the skill network's focus follows the pointer (see skillNet in app.js) and the
+   career arc's isolate is a plain CSS :hover, so a "hover to..." clause is an
+   instruction a phone cannot carry out, in a note that is five or six lines of a
+   355px column when it is unwrapped.
+
+   Keyed on the pointer, not on width, because the question is what the input
+   device can do: a narrow desktop window still has a mouse, and hiding the hover
+   copy there would take away a working interaction. The figures themselves stay
+   keyed on width, since that is a legibility question.
+
+   The .coarse-only half of this pair is gone. It carried "tap any chip to take
+   over", which was the touch wording for the two legends, and there are no chips
+   to tap any more: below the walk's breakpoint the figures simply rest whole.
+   What is left is one-directional — a clause that only a pointer can act on —
+   so it is one class. */
+@media (pointer: coarse) {
+  .fine-only {
+    display: none;
+  }
+}
+
+/* Below this the header is tall and narrow, the text fills it, and a backdrop
+   behind that much type is a legibility problem rather than an effect. Phones
+   also pay the most for 750 KB and get the least out of a particle field. */
+@media (max-width: 900px) {
+  .masthead-object {
+    display: none;
+  }
+  /* The hero's height exists to give the cloud room. With no cloud it is just
+     an empty screenful before the content starts. */
+  .masthead {
+    min-height: 0;
+    padding: 0 0 2.5rem;
+    display: block;
+  }
+  /* The lead row is `nowrap` because on a wide screen its three items are the
+     header's one strong line and a wrap would break the rhythm. There is no
+     width here to hold them, so it stacks instead of wrapping: wrapping would
+     leave a dot stranded at the end of a line, which is exactly the failure the
+     drawn separator exists to avoid. Stacked, the dots have no job and go. */
+  .bio-lead {
+    flex-direction: column;
+    flex-wrap: wrap;
+    white-space: normal;
+    gap: 0.35rem;
+  }
+  .bio-lead i {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .avatar-ring {
+    position: static;
+    margin: 0 auto 1.2rem;
+    width: 104px;
+    height: 104px;
+  }
+
+  /* Orphan control for the two rows that wrap here, both found by rendering at
+     390px rather than by reading the CSS.
+
+     A three-word name broke over a line holding just its suffix, and
+     the degree as two full lines over a line holding just "2026". A last line
+     carrying one short token reads as a mistake rather than as a line break,
+     and it is the credential row, which is the part a recruiter scans first.
+
+     `balance` is the fix for the name: it is a heading of a known short length,
+     which is exactly the case the property is for, and it balances the given
+     names against the surname rather than stranding the suffix.
+
+     The degree needs the tracking cut as well, because balancing alone would
+     still be three lines. At the base tracking, over roughly eighty characters,
+     it is spending several characters of width on air, which is affordable on
+     a desktop row and is not here. 0.04em keeps the uppercase row readable,
+     since uppercase still needs some, and buys the line back. */
+  .name {
+    text-wrap: balance;
+  }
+  /* Steps back toward the old size here, and only here. 0.9rem is what makes the
+     block read as one piece on a desktop row; at 390px it is simply too much
+     width for a credential that is already the longest string in the masthead,
+     and it pushed the degree from two lines to three. */
+  .bio-meta {
+    font-size: 0.82rem;
+    letter-spacing: 0.06em;
+  }
+  .bio-degree {
+    letter-spacing: 0.04em;
+    text-wrap: balance;
+  }
+  #skill-net {
+    height: 480px;
+  }
+
+  /* The results chart is a fixed 980-unit viewBox scaled to the column, so its
+     type shrinks with the viewport while the network's does not (that canvas is
+     drawn in real CSS pixels at 13px on any width, which is why it stays). 760px
+     is where this stops working rather than a round number: the column is 712px
+     there, a 0.727 scale, which puts the chart's 14px value labels at 10.2 CSS
+     px and its 17px point labels at 12.4. One step narrower and the values are
+     under 10 and falling.
+
+     So the table takes over. It is not a degraded fallback at this width, it is
+     the better figure: same numbers, at full size, and shorter. app.js opens it,
+     and a visitor without JS gets the closed <details> and its summary, which is
+     still readable and still works. */
+  .results-wrap {
+    display: none;
+  }
+  .results-table {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .page {
+    padding: 3rem 1.1rem;
+  }
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+  .stat-value {
+    font-size: 1.4rem;
+  }
+  .chat {
+    padding: 1.2rem;
+  }
+  #skill-net {
+    height: 400px;
+  }
+}
