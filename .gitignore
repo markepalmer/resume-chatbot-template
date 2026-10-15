@@ -16,3 +16,6 @@ __pycache__/
 # deferred, not made. Revisit before the repo goes public: shipping it says
 # something about how the site was built, and so does leaving it out.
 .claude/
+
+# Local résumé files, kept out of the public repo
+resumes/

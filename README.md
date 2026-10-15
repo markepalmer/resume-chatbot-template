@@ -138,6 +138,12 @@ You can make it your own by editing three things. No frontend code required.
    decide whether it is worth signing up for anything. The key is yours and is never shared with this
    repo's author; it is read from the environment and never sent to the browser.
 
+   **Groq's free tier needs no credit card.** It is capped by rate limits rather than billed, so going
+   over returns a rate limit error, never a charge. The caps vary by model and account; your exact
+   numbers are on the Limits page of the Groq console. The site's own guardrails (see Notes) are
+   sized to keep a personal site inside them, and adding a payment method later moves you to the paid tier
+   with higher caps.
+
 That is it. Nothing about you is hardcoded in the application code.
 
 ## How it works
@@ -277,6 +283,24 @@ reaches the browser, so nothing unverified is ever shown and then rewritten.
 The deployable artifact is the `Dockerfile`, so anything that runs a container will host this. The
 app listens on `$PORT` when the platform sets one and on 7860 otherwise, which covers both
 conventions without a second image.
+
+**Which free host?** Cloud Run, below, is the reference: fast, and free at personal site traffic,
+but it needs a card on file. With no card, use Render's free tier, next. Either way the whole site,
+Groq included, costs nothing.
+
+### Render (free, no card usually needed)
+
+1. Push your copy of this repo to GitHub.
+2. At https://render.com, sign up, choose **New > Web Service**, connect the repo, and pick the
+   **Free** instance type. Render finds the `Dockerfile` and sets `$PORT` itself.
+3. Under **Environment**, add `GROQ_API_KEY` with your key. Deploy.
+
+Every push to your default branch redeploys. The tradeoffs of free: the service sleeps after 15
+minutes with no visitors, and the first visit after that waits about a minute while it wakes, so
+open it yourself before sharing the link with someone. The free instance has 512 MB of memory; this
+app measured about 330 MB with its index loaded, so it fits. It is a single instance, which the
+rate limiter requires anyway (see the Cloud Run notes on `--max-instances=1`). Render may ask some
+new accounts for a card as identity verification; nothing is charged on the free instance.
 
 ### Google Cloud Run (the reference deployment)
 

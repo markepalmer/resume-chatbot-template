@@ -143,8 +143,8 @@ def person_ld_json(origin: str = "") -> str:
 
     ``origin`` is the scheme and host this response is actually being served
     from, and it is what ``image`` is built against. It is deliberately not
-    ``site_url``: that is the GitHub Pages address, which is a static redirect
-    and serves no files of its own, so an image URL under it is a guaranteed
+    ``site_url``: that may be a static redirect (it was the GitHub Pages address
+    until 2026-10-07), which serves no files of its own, so an image URL under it is a guaranteed
     404 (docs/deployment.md). ``url`` stays ``site_url``, because that is the
     stable public address a card should point a reader at, and the one already
     printed in sent applications.

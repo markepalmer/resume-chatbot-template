@@ -749,8 +749,8 @@ async def index(request: Request) -> HTMLResponse:
     prefill = profile["ask_links"].get(request.query_params.get("ask", ""), "")
 
     # The origin this response is actually served from, which is where the
-    # social card's image has to be fetched from. Not `site_url`: that is the
-    # Pages redirect, which hosts no files (docs/deployment.md). Taken from the
+    # social card's image has to be fetched from. Not `site_url`: that may be a
+    # redirect, which hosts no files (docs/deployment.md). Taken from the
     # request so it needs no config and cannot go stale when the Cloud Run
     # hostname changes, which is the failure the Pages indirection exists for.
     origin = request_origin(request)
